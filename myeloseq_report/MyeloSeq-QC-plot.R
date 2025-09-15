@@ -7,9 +7,13 @@ library(ggplot2)
 library(stringr)
 library(ini)
 #Set working directory
-conf <- read.ini("/Users/yangy15/Documents/oncomine_automation/ion_config.conf")
-# Access values like a list
-work_dir = conf$MYELOSEQ$MYELOSEQ_HOME
+args <- commandArgs(trailingOnly = TRUE)
+
+if (length(args) < 1) {
+  stop("Usage: Rscript MyeloSeq-QC-plot.R work_dir")
+}
+
+work_dir <- args[1]
 
 QC_file.list = list.files(path = work_dir, "*_filtered_variants.tsv", full.names = T)
 run_id <- read.csv(QC_file.list[1],sep = "\t")[1,1]
