@@ -8,7 +8,7 @@ runID <- args[1]
 # read config
 
 # read the config file
-conf <- read.ini("/Users/yangy15/Documents/oncomine_auto_copy/ion_config.conf")
+conf <- read.ini("/Users/yangy15/Documents/oncomine_automation/ion_config.conf")
 
 # Access values like a list
 output_path = conf$MYELOSEQ$DEST_PATH
@@ -17,12 +17,11 @@ dropout_dir = conf$MYELOSEQ$DROPOUT_DIR
 #
 PATH_Samplesheet <- paste0(output_path,"/worksheet.dropoffs/",
                            runID, ".xlsm")
-# PATH_Samplesheet <- paste0("/Users/yangy15/OneDrive - NYU Langone Health/myeloseq_gender_profile/", runID, "/", runID,".xlsm")
 # clean up samplesheet
 samplesheet <- read_excel(PATH_Samplesheet, sheet = 1, skip = 5)
 samplesheet <- as.data.frame(na.omit(samplesheet[,c("Bar code", "Accession #", "DNA #", "Chip #")]))
 targets <- read.table(paste0(work_dir, "/QC_data/Oncomine_Myeloid.20170817.designed.DNA.bed"), header = FALSE, sep="\t",stringsAsFactors=FALSE, quote="")
-# targets <- read.table("sample_data/Oncomine_Myeloid.20170817.designed.DNA.bed", header = FALSE, sep="\t",stringsAsFactors=FALSE, quote="")
+
 chrX <- targets[targets$V1 == "chrX",]
 samplesheet$`Bar code` <- ifelse(samplesheet$`Bar code` < 10,
                                  paste0("IonXpress_00", samplesheet$`Bar code`), paste0("IonXpress_0", samplesheet$`Bar code`))
@@ -31,7 +30,6 @@ chips <- unique(samplesheet$`Chip #`)
 # get number of chips
 get_one_plot <- function(samplesheet, runID, chip_num) {
   coverage_PATH <- paste0(dropout_dir,"/",runID)
-  # coverage_PATH <- paste0("/Users/yangy15/OneDrive - NYU Langone Health/myeloseq_gender_profile/",runID)
   coverage_file <- list.files(coverage_PATH)[grepl(list.files(coverage_PATH),pattern = paste0(runID,"-", chip_num))]
   coverage_n <- read.table(paste0(coverage_PATH, "/",coverage_file), header = 1)
   chip <- samplesheet[samplesheet$`Chip #` == chip_num,]
