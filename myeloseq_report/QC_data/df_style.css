@@ -1,0 +1,50 @@
+/* includes alternating gray and white with on-hover color */
+
+.mystyle {
+    border-collapse: collapse;
+    margin: 15px 0;
+    font-size: 0.8em;
+    font-family: sans-serif;
+    min-width: 400px;
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.15);
+}
+
+.mystyleoutter { overflow-x: scroll; }
+
+.mystyle thead tr {
+    background-color: #009879;
+    color: #ffffff;
+    text-align: left;
+    font-width: bold;
+    font-size: 0.8em;
+}
+
+.mystyle td, th {
+    padding: 3px;
+    min-width: 100px;
+}
+
+.mystyle tbody tr {
+    border-bottom: 1px solid #dddddd;
+}
+
+.mystyle tbody tr:nth-of-type(even) {
+    background-color: #f3f3f3;
+}
+
+.mystyle tbody tr:last-of-type {
+    border-bottom: 2px solid #009879;
+}
+
+.mystyle tr:nth-child(even) {
+    background: #E0E0E0;
+}
+
+.mystyle tr:hover {
+    background: silver;
+    cursor: pointer;
+}
+.mystyle tbody tr.active-row {
+    font-weight: bold;
+    color: #a096c6;
+}

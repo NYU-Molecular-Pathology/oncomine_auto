@@ -1,0 +1,22 @@
+Amino_Acid_Change,Codon,Letter
+alanine,Ala,A
+arginine,Arg,R
+asparagine,Asn,N
+aspartic acid,Asp,D
+cysteine,Cys,C
+glutamine,Gln,Q
+glutamic acid,Glu,E
+glycine,Gly,G
+histidine,His,H
+isoleucine,Ile,I
+leucine,Leu,L
+lysine,Lys,K
+methionine,Met,M
+phenylalanine,Phe,F
+proline,Pro,P
+serine,Ser,S
+threonine,Thr,T
+tryptophan,Trp,W
+tyrosine,Tyr,Y
+valine,Val,V
+termination,Ter,Ter
