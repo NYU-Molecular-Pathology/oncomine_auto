@@ -364,9 +364,9 @@ class myeloseq(object):
 
     def copy_files(self, run_id):
         logger.info("Generating QC plots...")
-        QC_plot_cmd = "Rscript MyeloSeq-QC-plot.R"
+        QC_plot_cmd = "Rscript MyeloSeq-QC-plot.R " + self.MYELOSEQ_HOME
         os.system(QC_plot_cmd)
-        chrX_plot_cmd = "Rscript development_script_chrX_coverage.R " + run_id
+        chrX_plot_cmd = "Rscript development_script_chrX_coverage.R " + run_id + " " + config_file
         os.system(chrX_plot_cmd)
 
         logger.info("Copying the QC plots over to the Z drive...")
