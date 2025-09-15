@@ -44,6 +44,7 @@ class myeloseq(object):
         self.LOCATIONS = config['MYELOSEQ']['LOCATIONS'].split(",")
         self.STYLE_CSS = config['MYELOSEQ']['STYLE_CSS']
         self.VAR_TYPES = config['SOLID']['VAR_TYPES'].split(";")
+        self.BAM_DIR = config['DEFAULT']['BAM_DOWNLOADS_DIR']
 
         self.codon_df = pd.read_csv(self.AA_CODES, sep=',')
         self.myeloseq_68genes = pd.read_excel(self.MYELOSEQ_GENES, engine='openpyxl', sheet_name='68-gene', skiprows=0)
@@ -131,10 +132,11 @@ class myeloseq(object):
             return "[" in row['protein'] or "," in row['protein'] or ";" in row['protein']
         except:
             return False
+
     def get_download_link(self, sample):
         """
-        Keep the same behavior: return the download URL (string) or None.
-        Iterates v1, v2, ... and returns the last valid one (like your original loop).
+        Return a tuple (download_link, name) or None if not found.
+        Iterates v1, v2, ... and returns the last valid one.
         """
         try:
             headers = {
@@ -162,22 +164,30 @@ class myeloseq(object):
             if not last_ok:
                 return None
 
-            # Robustly pull out data_links whether JSON is a list or dict.
-            payload = last_ok.json()
-            if isinstance(payload, list) and payload:
-                data_links = payload[0].get("data_links")
-            elif isinstance(payload, dict):
-                data_links = payload.get("data_links")
+            j = last_ok.json()
+
+            # Pull out fields depending on structure
+            if isinstance(j, list) and j:
+                data_links = j[0].get("data_links")
+                name_field = j[0].get("name")
+            elif isinstance(j, dict):
+                data_links = j.get("data_links")
+                name_field = j.get("name")
             else:
                 data_links = None
+                name_field = None
 
-            # Normalize to string if it’s a list.
+            # Normalize data_links to a single string
             if isinstance(data_links, list):
                 data_links = data_links[0] if data_links else None
 
-            return str(data_links) if data_links else None
+            if data_links:
+                return str(data_links), name_field
+            else:
+                return None
         except Exception:
             return None
+
 
     def download_zip(self, sample):
         """
@@ -185,7 +195,7 @@ class myeloseq(object):
         """
         try:
             print("downloading zip")
-            download_link = self.get_download_link(sample)
+            download_link= self.get_download_link(sample)[0]
             print(download_link)
             if not download_link:
                 return None, None, None
@@ -203,6 +213,7 @@ class myeloseq(object):
             r = requests.get(download_link, headers=headers, timeout=120, allow_redirects=False, stream=True, verify=False)
             r
 
+            os.makedirs(self.VAR_HOME, exist_ok=True) 
             output_zip=os.path.join(self.VAR_HOME, "temp.zip")
 
             with open(output_zip, "wb") as f:
@@ -282,6 +293,70 @@ class myeloseq(object):
         return glob.glob(os.path.join(file_path, "%s*-full.tsv" % sample_pair))[0],\
             glob.glob(os.path.join(file_path, "%s*_Non-Filtered_*.vcf" %sample_pair))[0], \
             glob.glob(os.path.join(file_path, "%s*_Non-Filtered_*-oncomine.tsv" % sample_pair))[0]
+# adding BAM downloading 
+    def download_bam_file(self, url:str, sample: str, run_id:str):
+        """
+        Download a BAM file from the given inputBam URL and save it as {sample_name}.bam.
+        """
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "auth": self.TOKEN,
+            "Connection": "close"
+        }
+        
+        run_path = os.path.join(self.BAM_DIR, run_id)
+        os.makedirs(run_path, exist_ok=True) 
+
+        out_path = os.path.join(run_path, f"{sample}.bam")
+        
+        try:
+            with requests.get(url, headers=headers, stream=True, verify=False, timeout=600) as r:
+                r.raise_for_status()
+                print(f"Downloading {sample} BAM files")
+                with open(out_path, "wb") as f:
+                    for chunk in r.iter_content(chunk_size=8192):
+                        if chunk:
+                            f.write(chunk)
+            return out_path
+        except requests.RequestException as e:
+            print(f"Failed to download {sample}: {e}")
+            return None
+
+    def fetch_and_download_bams(self, sample: str, run_id: str):
+        """
+        Fetch inputBam links for an analysis and download the BAM files.
+        
+        Returns a dict mapping sampleName -> bam_path.
+        """
+        analysis= self.get_download_link(sample)[1]
+        results = {}
+        url = f"https://{self.HOST}/api/v1/getAssociatedBamfiles"
+        params = {"name": analysis, "type": "analysis"}
+        headers = {"Content-Type": "application/x-www-form-urlencoded", "Authorization": self.TOKEN}
+        
+        try:
+            resp = requests.get(url, headers=headers, params=params, verify=False, timeout=120)
+            resp.raise_for_status()
+            data = resp.json()
+            
+            for item in data:
+                for sample in item.get("sampleDetails", []):
+                    if sample.get("sampleRole") != "dna":
+                        continue
+
+                    sample_name = sample.get("sampleName")
+                    input_bams = sample.get("inputBam", [])
+                    if input_bams:
+                        bam_url = input_bams[0]  # usually one inputBam
+                        bam_url = bam_url.replace(
+            "https://DPZNKD3:443", f"https://{self.HOST}", 1)
+                        bam_path = self.download_bam_file(bam_url, sample_name, run_id)
+                        results[sample_name] = bam_path
+            return results
+        
+        except requests.RequestException as e:
+            print(f"Error fetching input BAMs: {e}")
+            return {}
 
     def clean_up(self):
         rm_downloads_cmd = 'rm -f %s/*.zip' % os.path.join(self.DEST_PATH, "downloads")
@@ -831,7 +906,14 @@ class myeloseq(object):
                 self._dropout.start()
                 # Copy files over to the share drive
                 self.copy_files(run_id)
-                logger.info('Took %s seconds to process samples', time() - ts)
+                for sample in list(sample_sheet['sample_id']):
+                    try:
+                        if sample == "" or sample == None or str(sample) == 'nan': continue
+                        logger.info('Downloading %s sample BAM', sample)
+                        self.fetch_and_download_bams(sample, run_id)
+                    except:
+                        pass
+            logger.info('Took %s seconds to process samples', time() - ts)
 
         except Exception as e:
              logger.error(str(e))
