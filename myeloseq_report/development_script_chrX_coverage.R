@@ -5,10 +5,11 @@ library(ggplot2)
 library(ini)
 args = commandArgs(trailingOnly=TRUE)
 runID <- args[1]
+config_path <- args[2]
 # read config
 
 # read the config file
-conf <- read.ini("/Users/yangy15/Documents/oncomine_automation/ion_config.conf")
+conf <- read.ini(config_path)
 
 # Access values like a list
 output_path = conf$MYELOSEQ$DEST_PATH
