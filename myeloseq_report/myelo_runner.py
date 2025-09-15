@@ -1,9 +1,12 @@
 import sys
 from myelo_worker import myeloseq
 
-if len(sys.argv) != 2:
-    print("Worksheet was not provided, try again!")
+if len(sys.argv) != 3:
+    print("Usage: myelo_runner.py <config_path> <worksheet>")
 else:
-    myelo_runner = myeloseq("/Users/yangy15/Documents/oncomine_automation/ion_config.conf")
-    myelo_runner.workbook = sys.argv[1]
+    config_path = sys.argv[1]
+    worksheet = sys.argv[2]
+
+    myelo_runner = myeloseq(config_path)
+    myelo_runner.workbook = worksheet
     myelo_runner.start()
