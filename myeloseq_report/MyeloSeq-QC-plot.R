@@ -7,7 +7,7 @@ library(ggplot2)
 library(stringr)
 library(ini)
 #Set working directory
-conf <- read.ini("/Users/yangy15/Documents/oncomine_auto_copy/ion_config.conf")
+conf <- read.ini("/Users/yangy15/Documents/oncomine_automation/ion_config.conf")
 # Access values like a list
 work_dir = conf$MYELOSEQ$MYELOSEQ_HOME
 
@@ -135,9 +135,9 @@ names(all_result)[1] <- "Sample"
 all_result$Sample<-gsub("_.*","",all_result$Sample)
 #List of locus
 message("generating snp locus2...")
-snps <- read.csv("/Users/yangy15/Documents/oncomine_auto_copy/myeloseq_report/QC_data/Myeloid.SNP_locus.csv")
+snps <- read.csv(paste0(work_dir,"/QC_data/Myeloid.SNP_locus.csv"))
 snps <- snps$Locus
-snps2 <- read.csv("/Users/yangy15/Documents/oncomine_auto_copy/myeloseq_report/QC_data/SNP_locus2.csv")
+snps2 <- read.csv(paste0(work_dir,"/QC_data/SNP_locus2.csv"))
 snps2 <- snps2$Locus
 
 #add the 2 CNV number replacing the VAF
