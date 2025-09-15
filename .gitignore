@@ -223,3 +223,4 @@ Variants/
 logs/
 .Rhistory
 .DS_Store
+*.sh
