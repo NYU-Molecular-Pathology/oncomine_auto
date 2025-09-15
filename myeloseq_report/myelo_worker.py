@@ -1,5 +1,5 @@
 """myelo_worker.py: Automated workflow for oncomine myeloid assay."""
-# Version 3.2 - allele view compatible, new filter - oncoin
+# Version 4.0 - compatible with new IR; BAM downloading module
 __author__      = "Kelsey Zhu, Summer Yang"
 __copyright__   = "Copyright 2022, Langone Pathlab"
 
