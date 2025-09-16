@@ -1,9 +1,12 @@
 import sys
 from ion_worker import oncomine_solid
 
-if len(sys.argv) != 2:
-    print("Worksheet was not provided, try again!")
+if len(sys.argv) != 3:
+    print("Usage: ion_runner.py <config_path> <worksheet>")
 else:
-    ion_worker = oncomine_solid("/Users/yangy15/Documents/oncomine_auto_copy/ion_config.conf")
-    ion_worker.workbook = sys.argv[1]
+    config_path = sys.argv[1]
+    worksheet = sys.argv[2]
+
+    ion_worker = oncomine_solid(config_path)
+    ion_worker.workbook = worksheet
     ion_worker.start()
