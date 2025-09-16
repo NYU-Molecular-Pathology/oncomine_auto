@@ -7,9 +7,13 @@ library(tibble)
 library(ggplot2)
 
 #Set working directory
-library("ini")
-conf <- read.ini("/Users/yangy15/Documents/oncomine_auto_copy/ion_config.conf")
-wd <- conf$SOLID$HOME_DIR
+args <- commandArgs(trailingOnly = TRUE)
+
+if (length(args) < 1) {
+  stop("Usage: Rscript Oncosolid_QC_plot.R work_dir")
+}
+
+wd <- args[1]
 
 ######## process sensitive control data ######################
 #oncominedata<-read.csv("sc_filtered_variants.tsv",sep = "\t")
