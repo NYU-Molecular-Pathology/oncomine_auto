@@ -16,13 +16,10 @@ warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl')
 warnings.simplefilter(action='ignore', category=FutureWarning)
 urllib3.disable_warnings()
 
-config = configparser.ConfigParser()
-config.read("/Users/yangy15/Documents/oncomine_auto_copy/ion_config.conf")
-HOST=config["DEFAULT"]["HOST"]
-TOKEN=config["DEFAULT"]["TOKEN"]
-
 def get_options():
     parser = argparse.ArgumentParser()
+    parser.add_argument("-c", "--config", type=str, required=True,
+        help="Path to config file (e.g. ion_config.conf)")
     parser.add_argument("-r", "--runid", type=str, required=True,
                         help="Run ID 22-MGON37")
     parser.add_argument("-i", "--input", type=str, required=False, default="/mnt/Z_drive/Molecular/IonTorrent/oncosolid_autoreport/dropoff/",
@@ -30,6 +27,13 @@ def get_options():
     parser.add_argument("-o", "--output", type=str, required=False, default="/home/ionadmin/ion_report/",
                         help="Output directory")
     return parser.parse_args()
+
+def load_config(config_path):
+    config = configparser.ConfigParser()
+    config.read(config_path)
+    HOST=config["DEFAULT"]["HOST"]
+    TOKEN=config["DEFAULT"]["TOKEN"]
+    return HOST, TOKEN
 
 
 def get_mapd_values(sampleName):
@@ -111,6 +115,7 @@ def build_mapd_csv(sample_sheet):
 
 def main():
     args = get_options()
+    HOST, TOKEN = load_config(args.config)
     xlsxFi = os.path.join(args.input, args.runid + '.xlsm')
     print("Reading file: " + xlsxFi)
     template_file = pd.ExcelFile(xlsxFi, engine='openpyxl')
