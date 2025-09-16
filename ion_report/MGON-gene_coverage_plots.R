@@ -9,12 +9,12 @@ gb <- globalenv(); assign("gb", gb)
 args <- commandArgs(TRUE)
 
 specificRun <- args[1]
-#onco_InDir <- args[2]
-#outFolder <- args[3]
+config_path <- args[2]
+# read config
 
-#specificRun <- "22-MGON37"
+# read the config file
 library("ini")
-conf <- read.ini("/Users/yangy15/Documents/oncomine_auto_copy/ion_config.conf")
+conf <- read.ini(config_path)
 
 # Access values like a list
 onco_InDir <- conf$SOLID$DEST_PATH
