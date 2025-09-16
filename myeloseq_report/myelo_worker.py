@@ -28,6 +28,7 @@ RESULTS = list()
 class myeloseq(object):
 
     def __init__(self, conf_file):
+        self.conf_file = conf_file
         config = configparser.ConfigParser()
         config.read(conf_file)
         self.HOST = config['DEFAULT']['HOST']
@@ -196,7 +197,7 @@ class myeloseq(object):
         try:
             print("downloading zip")
             download_link= self.get_download_link(sample)[0]
-            print(download_link)
+
             if not download_link:
                 return None, None, None
             download_link = download_link.replace(
@@ -366,7 +367,7 @@ class myeloseq(object):
         logger.info("Generating QC plots...")
         QC_plot_cmd = "Rscript MyeloSeq-QC-plot.R " + self.MYELOSEQ_HOME
         os.system(QC_plot_cmd)
-        chrX_plot_cmd = "Rscript development_script_chrX_coverage.R " + run_id + " " + config_file
+        chrX_plot_cmd = "Rscript development_script_chrX_coverage.R " + run_id + " " + self.conf_file
         os.system(chrX_plot_cmd)
 
         logger.info("Copying the QC plots over to the Z drive...")
