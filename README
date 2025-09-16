@@ -1,0 +1,16 @@
+## Oncomine/Myeloseq Automation  
+### Process Overview  
+
+This workflow performs the following steps in sequence:  
+
+1. **Detect samplesheet drop-off** on the research network drive (performed by the lab).  
+2. **Parse the samplesheet** to extract the run ID and sample IDs.  
+3. **Download VCF and TSV files** from Ion Reporter via API calls.  
+4. **Filter raw VCFs** to generate outputs identical to Ion Reporter (CSV/XLSX).  
+5. **Generate QC plots** in PNG and PDF formats.  
+6. **Calculate dropouts** and produce a `dropout.html` report.  
+7. **Download BAM files** from Ion Reporter.  
+
+
+## Instructions to Run  
+...to be edited once set up 
