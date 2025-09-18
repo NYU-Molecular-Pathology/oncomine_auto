@@ -115,6 +115,7 @@ def build_mapd_csv(sample_sheet):
 
 def main():
     args = get_options()
+    global HOST, TOKEN
     HOST, TOKEN = load_config(args.config)
     xlsxFi = os.path.join(args.input, args.runid + '.xlsm')
     print("Reading file: " + xlsxFi)
