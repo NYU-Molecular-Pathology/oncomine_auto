@@ -1,5 +1,5 @@
 """myelo_worker.py: Automated workflow for oncomine myeloid assay."""
-# Version 4.0 - compatible with new IR; BAM downloading module
+# Version 4.1 - compatible with new IR; BAM downloading module; processing only IR filtered VCF
 __author__      = "Kelsey Zhu, Summer Yang"
 __copyright__   = "Copyright 2022, Langone Pathlab"
 
@@ -260,7 +260,6 @@ class myeloseq(object):
         # Step 3: unzip the nested zip
         nested_dir = os.path.join(temp_dir, "nested")
         os.makedirs(nested_dir, exist_ok=True)
-        print(f"Made the nexted directory {nested_dir}")
         with zipfile.ZipFile(nested_zip, 'r') as z:
             z.extractall(nested_dir)
 
@@ -292,8 +291,8 @@ class myeloseq(object):
         sample_pair=os.path.basename(target_subdir)
         file_path = os.path.join(self.VAR_HOME,sample_pair)
         return glob.glob(os.path.join(file_path, "%s*-full.tsv" % sample_pair))[0],\
-            glob.glob(os.path.join(file_path, "%s*_Non-Filtered_*.vcf" %sample_pair))[0], \
-            glob.glob(os.path.join(file_path, "%s*_Non-Filtered_*-oncomine.tsv" % sample_pair))[0]
+            glob.glob(os.path.join(file_path, "%s*_Filtered_*.vcf" %sample_pair))[0], \
+            glob.glob(os.path.join(file_path, "%s*_Filtered_*-oncomine.tsv" % sample_pair))[0]
 # adding BAM downloading 
     def download_bam_file(self, url:str, sample: str, run_id:str):
         """
@@ -647,141 +646,155 @@ class myeloseq(object):
 
     def process_sample(self, args):
         sample, run_id, bar_code, logger = tuple(args)
-        logger.info("start processing %s from %s"%(sample,run_id))
-        filtered_tsv, filtered_vcf, oncomine_tsv = self.get_tsv_file(sample)
-        print("tsv path is: ")
-        print(filtered_tsv)
-        print("vcf path is: ")
-        print(filtered_vcf)
-        if filtered_tsv:
-            if filtered_vcf:
-                try:
-                    ion_fusions = pd.read_csv(filtered_vcf, sep="\t", skiprows=188)
-                    ion_fusions = ion_fusions.loc[ion_fusions['FILTER'].isin(["PASS","."])]
-                    ion_fusions['fusion_key'] = ion_fusions.apply(lambda x: self.get_vcf_fusion_key(x), axis=1)
-                    ion_fusions['Read Counts'] = ion_fusions.apply(lambda x: self.get_fusion_read_counts(x), axis=1)
-                    ion_fusions['Read/M'] = ion_fusions.apply(lambda x: self.get_fusion_RPM(x), axis=1)
-                    ion_fusions['Read/M'] = ion_fusions['Read/M'].astype(float)
-                    ion_fusions['Read/M'] = ion_fusions['Read/M'].apply(np.int64)
-                    ion_fusions = ion_fusions[['fusion_key',"Read Counts","Read/M"]]
-                    # print(ion_fusions.to_string())
-                    ion_fusions = ion_fusions.loc[ion_fusions["Read Counts"].astype(int) >= 15]
-                    print("ion fusions")
-                    print (ion_fusions.to_string()) #EMPTY
-                except Exception as e:
-                    logger.error(str(e))
-                    ion_fusions = None
-            ion_variants = pd.read_csv(filtered_tsv, sep="\t", skiprows=2)
+        logger.info("start processing %s from %s", sample, run_id)
 
-            # filters that are applied
-            ion_variants = ion_variants.loc[(ion_variants['filter'].isin(['PASS','GAIN','.','LOSS'])) &
-                                                            (~ion_variants['type'].isin(self.EXCL_CALLS))]
-            ion_variants['tumor_AF'] = ion_variants.apply(lambda x: self.get_tumor_AF(x), axis=1)
-            ion_variants['ExAC_info'] = ion_variants.apply(lambda x: self.get_ExAC_info(x), axis=1)
-            ion_variants['DP'] = ion_variants.apply(lambda x: self.get_read_depth(x), axis=1)
-            ion_variants['MAF'] = ion_variants.apply(lambda x: self.get_alt_maf(x), axis=1)
-            ion_variants['HS'] = ion_variants.apply(lambda x: "yes" if self.is_hotspot(x) else "", axis=1)
-            ion_variants['artifact'] = ion_variants.apply(lambda x: self.is_artifact(x), axis=1)
-            ion_variants['function'] = ion_variants.apply(lambda x: self.remove_function_bar(x), axis=1)
-            ion_variants['splice_site'] = ion_variants.apply(lambda x: self.get_location(x), axis=1)
-            ion_variants['MNV'] = ion_variants.apply(lambda x: "MNV" if self.is_mnv(x) else "", axis=1)
-            #change
-            ion_variants['ONCOIN'] = ion_variants.apply(lambda x: "in" if self.oncomine_in(x) else "", axis=1)
-            ion_variants_snv = ion_variants.loc[ ((ion_variants['HS'] == 'yes') | (ion_variants['type'] == 'FLT3ITD') |
-                                    ((ion_variants['type'].isin(self.VAR_TYPES))
-                                    & ((ion_variants['function'].isin(self.INCL_FUNCS)) | (ion_variants['splice_site'].isin(self.LOCATIONS)))
-                                    & ((ion_variants['MAF'].isnull()) |(ion_variants['MAF'].astype(float) <= 0.01))
-                                    & (~ion_variants['artifact']))) | (ion_variants['ONCOIN'] == 'in')]
-            ion_variants_snv = ion_variants_snv.reset_index(drop=True)
-            ion_variants_snv_new = ion_variants_snv.loc[((((ion_variants_snv['HS'] == 'yes') | (ion_variants_snv['ONCOIN'] == 'in')) &
-                                                      (ion_variants_snv['tumor_AF'].astype(float) >= 1)) |
-                                                     (ion_variants_snv['tumor_AF'].astype(float) >= 3))]
+        filtered_tsv_path, filtered_vcf_path, oncomine_tsv_path = self.get_tsv_file(sample)
+        print(f"Filtered_tsv_path is {filtered_tsv_path}")
+        print(f"Filtered_vcf_path is {filtered_vcf_path}")
 
-            ion_variants_fusion = ion_variants.loc[(ion_variants['type'].isin(['FUSION','RNAExonVariant']))]
-            ion_variants = pd.concat([ion_variants_snv_new, ion_variants_fusion], ignore_index=True)
-            ion_variants['fusion_key'] = ion_variants.apply(lambda x: self.get_tsv_fusion_key(x), axis=1)
-            #select oncomine genes
-            ion_variants['gene'] = ion_variants.apply(lambda x: self.select_gene(x), axis=1)
-            ion_variants['# locus'] = ion_variants.apply(lambda x: self.rename_locus(x), axis=1)
-            #ion_variants['anno_key'] = ion_variants.apply(lambda x: "%s:%s"%(x['gene'],x['# locus']),axis=1)
-            ion_variants['anno_key'] = ion_variants.apply(lambda x: "%s:%s:%s"%(x['gene'],x['# locus'],x['protein']),axis=1)
+        if not filtered_tsv_path or not filtered_vcf_path:
+            logger.warning("%s missing TSV/VCF paths", sample)
+            return self._empty_result(sample, run_id, bar_code)
 
-            if not sample.startswith("NC-DNA") or not sample.startswith("NTC-DNA") or not sample.startswith("SC-DNA"):
-                ion_variants = ion_variants.loc[~((ion_variants['gene'] == 'CBL') &
-                                                  (ion_variants['# locus'] == 'chr11:119149355')
-                                                  & (ion_variants['type'] == "INDEL") &
-                                                  (ion_variants['genotype'] == "TATGATGATGATGATGATGA/TATGATGATGATGATGA") &
-                                                 (ion_variants['tumor_AF'].astype(float) >= 0.03) )]
-                ion_variants = ion_variants.loc[~((ion_variants['gene'] == 'SH2B3') &
-                                                  (ion_variants['# locus'].isin(['chr12:111885351','chr12:111885350'])))]
-                ion_variants = ion_variants.loc[~( (ion_variants['type'].isin(["SNV","FLT3ITD"])) &(ion_variants['genotype'] == "C/C") & ( ion_variants['gene'].isin(['ASXL1','FLT3'])))]
-            if ion_variants.empty:
-                return pd.DataFrame({"Run": run_id, "Sample": sample, "Barcode": bar_code,
-                                                   "Locus": 'negative', "Genes": 'NA', "Type": 'NA',
-                                                   "Exon": 'NA', "Transcript": 'NA', "Coding": 'NA',
-                                                   "Variant Effect": 'NA', 'Genotype': 'NA',
-                                                   "% Frequency": "NA", "ExAC_AF": 'NA', "Amino Acid Change": 'NA',
-                                                   "Read Counts": 'NA', "Read/M": 'NA', "AMAF": 'NA', "GMAF": 'NA',
-                                                    "EMAF": 'NA',"HS":"NA","Length":'NA','Coverage':'NA','Oncomine Variant Annotator v3.2':'NA'},
-                                                  index=[0])
+        ion_variants = None
 
-            new = ion_variants['ExAC_info'].str.split(":", n=2, expand=True)
-            ion_variants.insert(0, "Run", run_id)
-            ion_variants.insert(1, "Sample", sample)
-            ion_variants.insert(2, "Barcode", bar_code)
+        try:
+            print("Reading the vcf FILTERED")
+            filtered_vcf = pd.read_csv(filtered_vcf_path, sep="\t", skiprows=188)
 
-            print("Before filters are applied")
-            print(ion_variants.head(3).to_string())
-            if not ion_fusions.empty:
-                ion_variants = ion_variants.merge(ion_fusions, left_on="fusion_key", right_on="fusion_key",how="left")
-            else:
-                ion_variants['Read Counts'] = 'NA'
-                ion_variants['Read/M'] = 'NA'
+            if not filtered_vcf.empty:
+                filtered_vcf = filtered_vcf.loc[filtered_vcf['FILTER'].isin(["PASS", "."])]
+                filtered_vcf["fusion_key"] = filtered_vcf.apply(self.get_vcf_fusion_key, axis=1)
+                filtered_vcf["Read Counts"] = filtered_vcf.apply(self.get_fusion_read_counts, axis=1)
+                filtered_vcf["Read/M"] = (
+                    filtered_vcf.apply(self.get_fusion_RPM, axis=1)
+                    .astype(float).astype(np.int64)
+                )
+                filtered_vcf["locus"] = (
+                    filtered_vcf["#CHROM"].astype(str) + ":" + filtered_vcf["POS"].astype(str)
+                )
+                print(filtered_vcf.head(3).to_string())
 
-            ion_variants.drop(columns=['ExAC_info', 'go', '5000Exomes', 'hrun', 'drugbank',
-                                               'fusion_presence', 'ratio_to_wild_type',
-                                               'norm_count_within_gene', 'filter',
-                                               'allele_coverage', 'allele_ratio', 'pvalue','dgv',
-                                               'allele_frequency_%', 'MyVariantDefaultDb_hg19',
-                                               'phylop', 'pfam', 'location', 'maf',
-                                               'sift', 'polyphen', 'grantham', 'normalizedAlt',
-                                               'NamedVariants'], inplace=True)
+                filtered_tsv = pd.read_csv(filtered_tsv_path, sep="\t", skiprows=2)
+                filtered_tsv = filtered_tsv.loc[
+                    filtered_tsv["filter"].isin(["PASS", "GAIN", ".", "LOSS"])
+                    & (~filtered_tsv["type"].isin(self.EXCL_CALLS))
+                ]
+                pattern = "|".join(map(re.escape, filtered_vcf["locus"]))
+                ion_variants = filtered_tsv[filtered_tsv["# locus"].str.contains(pattern)]
 
-            ion_variants.rename(columns={'# locus': 'Locus', 'gene': 'Genes', 'exon': 'Exon',
-                                'transcript': 'Transcript', 'genotype': 'Genotype',
-                                'type': 'Type', 'coding': 'Coding', 'function': 'Variant Effect',
-                                'ref': 'Ref', 'tumor_AF': '% Frequency','length':'Length',
-                                'protein': 'Amino Acid Change', 'coverage': 'Coverage',
-                                'exac': 'ExAC', 'MAF':'ExAC_AF'},
-                            inplace=True)
-            ion_variants['AMAF'] = new[0]
-            ion_variants["GMAF"] = new[1]
-            ion_variants["EMAF"] = new[2]
-            print("check point")
-            print(ion_variants.to_string())
-            ion_variants = ion_variants[
-                ["Run", "Sample", "Barcode", "Locus", "Genes", "Type", "Exon", "Transcript", "Coding", "Variant Effect", "Genotype",
-                 "% Frequency", "ExAC_AF", "Amino Acid Change", "Read Counts", "Read/M", "AMAF", "GMAF", "EMAF","HS","Length","Coverage",'Oncomine Variant Annotator v3.2']]
-            logger.info("%s processed"%sample)
-            logger.info("After filters are applied")
-            ion_variants = ion_variants.drop_duplicates(subset=['Sample','Barcode','Locus','Genes','Type','Coding'])  ### remove duplicates
-            ion_variants['bad'] = ion_variants.apply(lambda x: self.empty_row(x), axis=1)
-            ion_variants = ion_variants.loc[ion_variants['bad'] != 1]
-            logger.info(ion_variants.head(3).to_string())
-            ion_variants.drop(columns=['bad'], inplace=True)
-            if ion_variants.empty:
-                return pd.DataFrame({"Run": run_id, "Sample": sample, "Barcode": bar_code,
-                                 "Locus": 'negative', "Genes": 'NA', "Type": 'NA',
-                                 "Exon": 'NA', "Transcript": 'NA', "Coding": 'NA',
-                                 "Variant Effect": 'NA', 'Genotype': 'NA',
-                                 "% Frequency": "NA", "ExAC_AF": 'NA', "Amino Acid Change": 'NA',
-                                 "Read Counts": 'NA', "Read/M": 'NA', "AMAF": 'NA', "GMAF": 'NA', "EMAF": 'NA',
-                                 "HS": "NA","Length":"NA","Coverage":"NA", "Oncomine Variant Annotator v3.2":"NA"},
-                                index=[0])
-            else:
-                return ion_variants
+                filtered_vcf = filtered_vcf[["fusion_key", "Read Counts", "Read/M"]]
+
+        except Exception as e:
+            logger.error("Error processing %s: %s", sample, str(e))
+            ion_variants = None
+
+        # --- handle empty case early ---
+        if ion_variants is None or ion_variants.empty:
+            print("saving empty results")
+            return self._empty_result(sample, run_id, bar_code)
+
+        # Add annotations
+        print("Adding annotations")
+        ion_variants["tumor_AF"] = ion_variants.apply(self.get_tumor_AF, axis=1)
+        ion_variants["ExAC_info"] = ion_variants.apply(self.get_ExAC_info, axis=1)
+        ion_variants["DP"] = ion_variants.apply(self.get_read_depth, axis=1)
+        ion_variants["MAF"] = ion_variants.apply(self.get_alt_maf, axis=1)
+        ion_variants["HS"] = ion_variants.apply(lambda x: "yes" if self.is_hotspot(x) else "", axis=1)
+        ion_variants["artifact"] = ion_variants.apply(self.is_artifact, axis=1)
+        ion_variants["function"] = ion_variants.apply(self.remove_function_bar, axis=1)
+        ion_variants["splice_site"] = ion_variants.apply(self.get_location, axis=1)
+        ion_variants["MNV"] = ion_variants.apply(lambda x: "MNV" if self.is_mnv(x) else "", axis=1)
+        ion_variants["fusion_key"] = ion_variants.apply(self.get_tsv_fusion_key, axis=1)
+        ion_variants["gene"] = ion_variants.apply(self.select_gene, axis=1)
+        ion_variants["# locus"] = ion_variants.apply(self.rename_locus, axis=1)
+        ion_variants["anno_key"] = ion_variants.apply(
+            lambda x: "%s:%s:%s" % (x["gene"], x["# locus"], x["protein"]), axis=1
+        )
+
+        new = ion_variants["ExAC_info"].str.split(":", n=2, expand=True)
+        ion_variants.insert(0, "Run", run_id)
+        ion_variants.insert(1, "Sample", sample)
+        ion_variants.insert(2, "Barcode", bar_code)
+
+        # print("Before filters are applied")
+        # print(ion_variants.head(3).to_string())
+
+        if not filtered_vcf.empty:
+            ion_variants = ion_variants.merge(filtered_vcf, on="fusion_key", how="left")
         else:
-            logger.warning("%s tsv file is not found or errors occur while processing the tsv"%sample)
+            ion_variants["Read Counts"] = "NA"
+            ion_variants["Read/M"] = "NA"
+        print("Before filters are applied")
+        print(ion_variants.head(3).to_string())
+        # Drop unnecessary columns
+        ion_variants.drop(
+            columns=[
+                "ExAC_info", "go", "5000Exomes", "hrun", "drugbank", "fusion_presence",
+                "ratio_to_wild_type", "norm_count_within_gene", "filter",
+                "allele_coverage", "allele_ratio", "pvalue", "dgv",
+                "allele_frequency_%", "MyVariantDefaultDb_hg19", "phylop", "pfam",
+                "location", "maf", "sift", "polyphen", "grantham", "normalizedAlt",
+                "NamedVariants"
+            ],
+            inplace=True,
+            errors="ignore"  # <-- ignore if missing
+        )
+
+        # Rename columns
+        ion_variants.rename(
+            columns={
+                "# locus": "Locus", "gene": "Genes", "exon": "Exon",
+                "transcript": "Transcript", "genotype": "Genotype",
+                "type": "Type", "coding": "Coding", "function": "Variant Effect",
+                "ref": "Ref", "tumor_AF": "% Frequency", "length": "Length",
+                "protein": "Amino Acid Change", "coverage": "Coverage",
+                "exac": "ExAC", "MAF": "ExAC_AF"
+            },
+            inplace=True
+        )
+
+        # Add new split columns
+        ion_variants["AMAF"] = new[0]
+        ion_variants["GMAF"] = new[1]
+        ion_variants["EMAF"] = new[2]
+
+        # Reorder columns
+        ion_variants = ion_variants[
+            ["Run", "Sample", "Barcode", "Locus", "Genes", "Type", "Exon",
+            "Transcript", "Coding", "Variant Effect", "Genotype", "% Frequency",
+            "ExAC_AF", "Amino Acid Change", "Read Counts", "Read/M",
+            "AMAF", "GMAF", "EMAF", "HS", "Length", "Coverage",
+            "Oncomine Variant Annotator v3.2"]
+        ]
+        
+        logger.info("%s processed", sample)
+        logger.info("After filters are applied")
+        print(ion_variants.head(3).to_string())
+        # Remove duplicates and bad rows
+        # ion_variants = ion_variants.drop_duplicates(
+        #     subset=["Sample", "Barcode", "Locus", "Genes", "Type", "Coding"]
+        # )
+        # ion_variants["bad"] = ion_variants.apply(self.empty_row, axis=1)
+        # ion_variants = ion_variants.loc[ion_variants["bad"] != 1]
+
+
+        return ion_variants
+
+
+    def _empty_result(self, sample, run_id, bar_code):
+        """Return a standard empty result DataFrame with NA values."""
+        return pd.DataFrame({
+            "Run": run_id, "Sample": sample, "Barcode": bar_code,
+            "Locus": "negative", "Genes": "NA", "Type": "NA",
+            "Exon": "NA", "Transcript": "NA", "Coding": "NA",
+            "Variant Effect": "NA", "Genotype": "NA",
+            "% Frequency": "NA", "ExAC_AF": "NA", "Amino Acid Change": "NA",
+            "Read Counts": "NA", "Read/M": "NA", "AMAF": "NA",
+            "GMAF": "NA", "EMAF": "NA", "HS": "NA", "Length": "NA",
+            "Coverage": "NA", "Oncomine Variant Annotator v3.2": "NA"
+        }, index=[0])
+
 
     def rename_genes(self, row):
         try:
@@ -865,48 +878,81 @@ class myeloseq(object):
             except IndexError:
                 sc2_sample_name = None
                 print("No matches found for 'm2-Seraseq'")
-            #sc2_sample_name = list(filter(lambda x: "m2-Seraseq" in x, list(sample_sheet['sample_id'])))[0]
+            
             logger.info("SC sample: %s" %sc_sample_name)
             for sample, barcode in zip(list(sample_sheet['sample_id']), list(sample_sheet['Bar code'])):
                 try:
                     if sample == "" or sample == None or str(sample) == 'nan': continue
-                    RESULTS.append(self.process_sample([sample,run_id,barcode,logging.getLogger(sample)]))
+                    df_result = self.process_sample([sample,run_id,barcode,logging.getLogger(sample)])
+                    RESULTS.append(df_result)
+                    logger.info("Processed sample %s -> %d rows", sample, len(df_result))
+                    logger.debug(df_result.head(3).to_string()) 
                 except:
                     pass
             if RESULTS and len(RESULTS) > 0:
                 df = pd.concat(RESULTS)
-                # sample_df = df
-                sc_df = df.loc[df['Sample'] == sc_sample_name]
-                sc_df['Read Counts'] = sc_df.apply(lambda x: 'NA' if (x['Type'] == "SNV" or x['Type'] == "INDEL") else x['Read Counts'], axis=1)
-                sc_df['Read/M'] = sc_df.apply(lambda x: 'NA' if (x['Type'] == "SNV" or x['Type'] == "INDEL") else x['Read/M'], axis=1)
-                sc_df.to_csv("sc_filtered_variants.tsv", index = False, sep = "\t")
+
+                # Process SC
+                sc_df = df.loc[df['Sample'] == sc_sample_name].copy()
+                if not sc_df.empty:
+                    sc_df.loc[:, 'Read Counts'] = sc_df.apply(
+                        lambda x: 'NA' if x['Type'] in ['SNV', 'INDEL'] else x['Read Counts'], axis=1
+                    )
+                    sc_df.loc[:, 'Read/M'] = sc_df.apply(
+                        lambda x: 'NA' if x['Type'] in ['SNV', 'INDEL'] else x['Read/M'], axis=1
+                    )
+                    sc_df.to_csv("sc_filtered_variants.tsv", index=False, sep="\t")
+
+                # Process SC2
                 if sc2_sample_name is not None:
-                    sc2_df = df.loc[df['Sample'] == sc2_sample_name]
+                    sc2_df = df.loc[df['Sample'] == sc2_sample_name].copy()
                     if not sc2_df.empty:
-                        sc2_df['Read Counts'] = sc2_df.apply(lambda x: 'NA' if (x['Type'] == "SNV" or x['Type'] == "INDEL") else x['Read Counts'], axis=1)
-                        sc2_df['Read/M'] = sc2_df.apply(lambda x: 'NA' if (x['Type'] == "SNV" or x['Type'] == "INDEL") else x['Read/M'], axis=1)
-                        sc2_df.to_csv("sc2_filtered_variants.tsv", index = False, sep = "\t")
-                sample_df = df.loc[~(df['Sample'].isin([sc_sample_name,sc2_sample_name]))]
-                # sample_df.to_csv("sample_df.csv",index=False, sep=",")
-                sample_df['Exon'] = sample_df['Exon'].apply(self.clean_exon)
+                        sc2_df.loc[:, 'Read Counts'] = sc2_df.apply(
+                            lambda x: 'NA' if x['Type'] in ['SNV', 'INDEL'] else x['Read Counts'], axis=1
+                        )
+                        sc2_df.loc[:, 'Read/M'] = sc2_df.apply(
+                            lambda x: 'NA' if x['Type'] in ['SNV', 'INDEL'] else x['Read/M'], axis=1
+                        )
+                        sc2_df.to_csv("sc2_filtered_variants.tsv", index=False, sep="\t")
+
+                # sample DF w/o SC1 SC2..
+                sample_df = df.loc[~df['Sample'].isin([sc_sample_name, sc2_sample_name])].copy()
+                sample_df.loc[:, 'Exon'] = sample_df['Exon'].apply(self.clean_exon)
                 logger.info(sample_df.to_string())
-                #print("after exon cleaning")
-                sample_df['Transcript'], sample_df['Coding'], sample_df['Amino Acid Change'] = zip(*sample_df.apply(lambda row: self.clean_transcript(row['Transcript'], row['Coding'], row['Amino Acid Change']), axis=1))
+
+                sample_df[['Transcript', 'Coding', 'Amino Acid Change']] = sample_df.apply(
+                    lambda row: self.clean_transcript(row['Transcript'], row['Coding'], row['Amino Acid Change']),
+                    axis=1, result_type='expand'
+                )
                 logger.info(sample_df.to_string())
+
+                # Save to excel xlsx
                 self.write_to_excel(sample_df)
-                add_df = sample_df.loc[~(sample_df['Sample'].str.contains("SC-DNA|NC-DNA"))]
+
+                # alternate for final csv reporting
+                add_df = sample_df.loc[~(sample_df['Sample'].str.contains("SC-DNA|NC-DNA", na=False))].copy()
                 add_df = add_df.drop(columns=['Run','AMAF','GMAF','EMAF','Read Counts','Read/M','ExAC_AF'])
-                add_df['AA'] = add_df.apply(lambda x: self.get_AA_Change(x), axis=1)
-                add_df = add_df.rename(columns={'Barcode':'BC','Variant Effect':'Variant.Effect','Amino Acid Change':'Amino.Acid.Change',
-                                       '% Frequency':'Frequency','HS':'Info'})
+                add_df.loc[:, 'AA'] = add_df.apply(self.get_AA_Change, axis=1)
+
+                add_df = add_df.rename(columns={
+                    'Barcode': 'BC',
+                    'Variant Effect': 'Variant.Effect',
+                    'Amino Acid Change': 'Amino.Acid.Change',
+                    '% Frequency': 'Frequency',
+                    'HS': 'Info'
+                })
+
                 add_df = add_df[['Sample','BC','Locus','Genes','Type','Exon','Transcript','Coding','Variant.Effect',
-                                 'Genotype','Info','Length','Frequency','Amino.Acid.Change','AA','Coverage']]
+                                'Genotype','Info','Length','Frequency','Amino.Acid.Change','AA','Coverage']]
+
                 print(add_df.head(3).to_string())
-                add_df.to_csv("%s.csv" % run_id, index=False, sep=",")
+                add_df.to_csv(f"{run_id}.csv", index=False, sep=",")
+
+                # Continue downstream tasks
                 self._dropout.workbook = self.workbook
                 self._dropout.start()
-                # Copy files over to the share drive
                 self.copy_files(run_id)
+
                 for sample in list(sample_sheet['sample_id']):
                     try:
                         if sample == "" or sample == None or str(sample) == 'nan': continue
