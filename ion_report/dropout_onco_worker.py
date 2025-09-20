@@ -40,7 +40,7 @@ class dropout(object):
         return sample_sheet
 
     def check_amplicons(self, row):
-        for k,v in row.iteritems():
+        for k,v in row.items():
             if int(v) < 500:
                 return "FAIL"
         return "PASS"
