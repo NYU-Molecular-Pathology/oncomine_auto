@@ -172,10 +172,13 @@ message("generating set2 snps....")
 #snpsX <- read.csv("/home/ionadmin/myeloseq_report/QC_data/chrX SNP locus.csv")
 #snpsX <- snpsX$Locus
 res.targeloci_2<-subset(data0, Locus  %in% snps2)
+res.targeloci_2 <- res.targeloci_2 %>%
+  group_by(Sample, Locus) %>%
+  summarise(Frequency = sum(X..Frequency))
 set2 <- pivot_wider(
   res.targeloci_2,
   names_from = "Sample",
-  values_from = "X..Frequency",
+  values_from = "Frequency",
   values_fn = list(X..Frequency= list)) %>%
   unchop(everything())
 # data.e<-spread(res.targeloci, Sample, X..Frequency)
