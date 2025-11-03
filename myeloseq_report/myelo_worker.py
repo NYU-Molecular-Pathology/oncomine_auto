@@ -236,6 +236,10 @@ class myeloseq(object):
         or (None, None, None) if not found
         """
         temp_dir = "temp"
+        #Always start fresh
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+        os.makedirs(temp_dir, exist_ok=True)
         # os.makedirs(temp_dir, exist_ok=True)
         temp_zip = self.download_zip(sample)
         print(f"temp zip is {temp_zip}")
@@ -252,7 +256,7 @@ class myeloseq(object):
                     break
             if nested_zip:
                 print(f"Copying files {nested_zip} into {self.DEST_PATH}")
-                shutil.copy(nested_zip, os.path.join(self.DEST_PATH, "downloads"))
+                shutil.copyfile(nested_zip, os.path.join(self.DEST_PATH, "downloads", os.path.basename(nested_zip)))
                 break
         if not nested_zip:
             raise FileNotFoundError("No nested zip found in temp.zip")
