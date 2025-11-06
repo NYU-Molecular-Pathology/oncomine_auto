@@ -13,7 +13,7 @@ conf <- read.ini(config_path)
 
 # Access values like a list
 output_path = conf$MYELOSEQ$DEST_PATH
-work_dir = getwd()
+work_dir = conf$MYELOSEQ$MYELOSEQ_HOME
 dropout_dir = conf$MYELOSEQ$DROPOUT_DIR
 #
 PATH_Samplesheet <- paste0(output_path,"/worksheet.dropoffs/",
@@ -43,7 +43,7 @@ get_one_plot <- function(samplesheet, runID, chip_num) {
     facet_wrap(~sample_name) +geom_dotplot(binaxis='y')+geom_boxplot(fill="white")+labs(title=paste0(runID, "-", chip_num))
   return(p)
 }
-output_PATH <- paste0("./")
+output_PATH <- work_dir
 pdf(paste0(output_PATH, "/", runID, "_chrX_coverage.pdf"),height = 10, width = 15)
 lapply(chips, function(x) get_one_plot(samplesheet, runID, x))
 dev.off()
