@@ -224,3 +224,10 @@ logs/
 .Rhistory
 .DS_Store
 *.sh
+ion_config_dev.conf
+nohup.out
+*.csv
+*.xlsx
+*.pdf
+*.tsv
+*.pdf
