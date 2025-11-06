@@ -90,8 +90,8 @@ process_SC_control <- function(x) {
     geom_point(size=6)+
     ggtitle(paste("Myeloid SC-Seraseq_",run_id,"DNA QC", paste("(chip#",chip,")",sep=""),":19 Sites Expected",sep = " ")) +
     xlab("Genomic Location") + ylab("Allele Frequency") +
-    geom_hline(yintercept=3, linetype="dashed",  color = "red", size=1)+
-    geom_hline(yintercept=15, linetype="dashed",  color = "blue", size=1)+
+    geom_hline(yintercept=3, linetype="dashed",  color = "red", linewidth=1)+
+    geom_hline(yintercept=15, linetype="dashed",  color = "blue", linewidth=1)+
     theme(axis.text.x = element_text(size = 7, angle = 45), legend.title = element_text(size=8),legend.text = element_text(size = 7), legend.key.size = unit(0.3, "cm")  )+
     scale_color_manual(values=c("goldenrod3", "brown2", "deepskyblue1", "plum1", "turquoise2", "orchid", "greenyellow","seagreen3","hotpink", "lightskyblue2", "mediumpurple1", "firebrick1","olivedrab", "blue",  "orange1", "darkolivegreen3", "tomato3", "tan4", "red4", "purple1", "gray4", "grey66","goldenrod2" ))+
     guides(col = guide_legend(ncol = 1)) + theme(plot.title = element_text(hjust = 0.5))
@@ -110,7 +110,7 @@ process_SC_control <- function(x) {
   RNAQC <- ggplot(RNAqcdata, aes(x=Genes, y=log2(as.numeric(as.character(Read.Counts))),color= Genes)) +
     geom_point(size=6)+ xlab("Fusions(Exome)") + ylab("log2 Read Counts") +
     ggtitle(paste("Myeloid SC_", run_id, "RNA QC",paste("(chip#",chip,")",sep=""),": 8 Events Expected",sep = " ")) +
-    geom_hline(yintercept=log2(100), linetype="dashed",  color = "red", size=1)+
+    geom_hline(yintercept=log2(100), linetype="dashed",  color = "red", linewidth=1)+
     theme(axis.text.x = element_text(size = 7, angle = 45), legend.title = element_text(size=8),legend.text =  element_text(size = 7), legend.key.size = unit(0.3, "cm")  )+
     scale_color_manual(values=c("seagreen3","hotpink", "lightskyblue2", "mediumpurple1", "firebrick1","olivedrab", "blue",  "orange1", "darkolivegreen3", "tomato3", "tan4", "red4", "purple1", "gray4", "grey66","goldenrod2", "brown", "deepskyblue3", "plum3", "turquoise", "orchid2", "greenyellow","salmon2" ))+
     guides(col = guide_legend(ncol = 1)) + theme(plot.title = element_text(hjust = 0.5))
@@ -118,7 +118,7 @@ process_SC_control <- function(x) {
 }
 
 QCplot = lapply(QC_file.list, process_SC_control) #list(DNAQC, RNAQC)
-pdf(paste("Myeloid-SC-QC-",run_id,".pdf",sep=""))
+pdf(paste(work_dir, "/Myeloid-SC-QC-",run_id,".pdf",sep=""))
 QCplot
 dev.off()
 ####### process SNP QC ##############
@@ -187,27 +187,27 @@ set2_processed <- as.data.frame((set2))
 rownames(set2_processed) <- set2_processed$Locus
 set2_processed <- set2_processed[-1]
 #write.csv(data.e, file=paste("QC-SNPs-final-",run_id,".csv",sep=""), row.names=FALSE)
-write.csv(data.e, file=paste("QC-SNPs-final-",run_id,".csv",sep=""), row.names=FALSE)
+write.csv(data.e, file=paste(work_dir, "/QC-SNPs-final-",run_id,".csv",sep=""), row.names=FALSE)
 #write.csv(chrX, file=paste("QC-SNPs-final-",run_id,"_chrX",".csv",sep=""), row.names=FALSE)
-write.csv(combined_final, file=paste("combined_final_",run_id,".csv",sep=""), row.names=FALSE)
+write.csv(combined_final, file=paste(work_dir, "/combined_final_",run_id,".csv",sep=""), row.names=FALSE)
 #imbalancefusion<-subset(combined_final,  (grepl(glob2rx("5p3pAssays") , X.rowtype.) )
 #& (as.numeric(X.INFO.1.5P_3P_ASSAYS.) > 0)
 #& !(X.call. == "NEG") & !(X.call. == "NOCALL"))
 #write.csv(imbalancefusion, file=paste("imbalancefusion_final_",run_id,".csv",sep=""), row.names=FALSE)
 # expcontrol QC
 expcontrol<-subset(combined_final,  (grepl(glob2rx("ExprControl") , X.rowtype.) ))
-write.csv(expcontrol, file=paste("expcontrol_",run_id,".csv",sep=""), row.names=FALSE)
+write.csv(expcontrol, file=paste(work_dir, "/expcontrol_",run_id,".csv",sep=""), row.names=FALSE)
 #Read.Counts
 expQC<- ggplot(expcontrol, aes(y=log2(as.numeric(as.character(X.INFO...READ_COUNT.))), x=Sample, color=Sample)) +
   geom_point(size=3)+ ylab("log2 Read Counts") +
   theme(axis.text.x = element_text(size = 6, angle = 65))+
   facet_wrap( ~X.INFO.1.GENE_NAME., ncol =2)+
-  geom_hline(yintercept=log2(1800), linetype="dashed",  color = "red", size=0.5)+
-  geom_hline(yintercept=log2(700), linetype="dashed",  color = "blue", size=0.5)+
+  geom_hline(yintercept=log2(1800), linetype="dashed",  color = "red", linewidth=0.5)+
+  geom_hline(yintercept=log2(700), linetype="dashed",  color = "blue", linewidth=0.5)+
   ggtitle(paste("Case Expression Control Myeloid QC_",run_id,sep="")) +
   guides(col = guide_legend ( ncol=1 )) +
   theme(legend.text=element_text(size=7))
-pdf(paste("Case_Expression_Control_Myeloid_QC_",run_id,".pdf",sep=""))
+pdf(paste(work_dir, "/Case_Expression_Control_Myeloid_QC_",run_id,".pdf",sep=""))
 expQC
 dev.off()
 ## process filtered full TSV file #######
@@ -230,7 +230,7 @@ combined_tsv <- distinct(filtered_result)
 combined_tsv <- as.data.frame(sapply(filtered_result, function(x) gsub("\"", "", x)))
 biallelicdata<-subset(combined_tsv, (grepl("|", protein, fixed = TRUE))
                       & (filter == "PASS") & (type %in% c("MNV","SNV")))
-write.csv(biallelicdata, file=paste("biallelicdata-final-",run_id,".csv",sep=""), row.names=FALSE)
+write.csv(biallelicdata, file=paste(work_dir, "/biallelicdata-final-",run_id,".csv",sep=""), row.names=FALSE)
 # generate snp check
 reformat_data <- function(data1,data2=NULL) { #current run vs past run
   if(is.null(data2)) {corr_data <- cor(data1, use = "pairwise",method = "pearson")} else {
@@ -274,6 +274,6 @@ get_plot <- function(data, runID1, runID2) { # current run itself
     coord_fixed()
 }
 
-pdf(paste0("snps_Comparison_",run_id,".pdf"))
+pdf(paste0(work_dir, "/snps_Comparison_",run_id,".pdf"))
 get_plot(data=reformat_data(data1=set2_processed),runID1 = run_id,runID2 = run_id)
 dev.off()
