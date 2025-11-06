@@ -19,6 +19,7 @@ import urllib3
 import shutil
 import sys
 import zipfile
+import subprocess
 #from ion_automation.myeloidseq.dropout_worker import dropout
 from dropout_worker import dropout
 
@@ -235,7 +236,7 @@ class myeloseq(object):
         From the unzipped directory, locate and return the three files (tsv, vcf, oncomine tsv).
         or (None, None, None) if not found
         """
-        temp_dir = "temp"
+        temp_dir = os.path.join(self.MYELOSEQ_HOME,"temp")
         #Always start fresh
         if os.path.exists(temp_dir):
             shutil.rmtree(temp_dir)
@@ -283,10 +284,10 @@ class myeloseq(object):
 
         # Step 5: copy that subdir to downloads_dir
         target_dir = self.VAR_HOME
-        shutil.copytree(
-            target_subdir,
-            os.path.join(target_dir, os.path.basename(target_subdir)))
-
+        dest_path = os.path.join(self.VAR_HOME, os.path.basename(target_subdir))
+        if os.path.exists(dest_path):
+            shutil.rmtree(dest_path)
+        shutil.copytree(target_subdir, dest_path)
         # Step 6: clean up
         os.remove(temp_zip)
         shutil.rmtree(temp_dir)
@@ -368,38 +369,42 @@ class myeloseq(object):
         os.system(rm_downloads_cmd)
 
     def copy_files(self, run_id):
+        script_dir = self.MYELOSEQ_HOME  # directory where this Python script lives
+        rscript1 = os.path.join(script_dir, "MyeloSeq-QC-plot.R")
+        rscript2 = os.path.join(script_dir, "development_script_chrX_coverage.R")
+        
         logger.info("Generating QC plots...")
-        QC_plot_cmd = "Rscript MyeloSeq-QC-plot.R " + self.MYELOSEQ_HOME
-        os.system(QC_plot_cmd)
-        chrX_plot_cmd = "Rscript development_script_chrX_coverage.R " + run_id + " " + self.conf_file
-        os.system(chrX_plot_cmd)
+        QC_plot_cmd = ["Rscript", rscript1, self.MYELOSEQ_HOME]
+        chrX_plot_cmd = ["Rscript", rscript2, run_id, self.conf_file]
+        subprocess.run(QC_plot_cmd, check=True)
+        subprocess.run(chrX_plot_cmd, check=True)
 
         logger.info("Copying the QC plots over to the Z drive...")
         mkdir_cmd = 'mkdir -p %s' % os.path.join(self.DEST_PATH, "reports/%s" % run_id)
         os.system(mkdir_cmd)
 
-        plot_cp_cmd = 'cp -f %s %s' % ("*.pdf", os.path.join(self.DEST_PATH, "reports/%s" % run_id))
+        plot_cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"*.pdf"), os.path.join(self.DEST_PATH, "reports/%s" % run_id))
         os.system(plot_cp_cmd)
 
-        csv_cp_cmd = 'cp -f %s %s' % ("*.csv", os.path.join(self.DEST_PATH, "reports/%s" % run_id))
+        csv_cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"*.csv"), os.path.join(self.DEST_PATH, "reports/%s" % run_id))
         os.system(csv_cp_cmd)
 
         logger.info("Copying the report over to the Z drive")
-        cp_cmd = 'cp -f %s %s' % ("%s.xlsx" % run_id, os.path.join(self.DEST_PATH, "reports/%s" % run_id))
+        cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir, "%s.xlsx" % run_id), os.path.join(self.DEST_PATH, "reports/%s" % run_id))
         os.system(cp_cmd)
 
         if os.path.exists("%s-dropouts.html" % run_id):
-            html_cmd = 'cp -f %s %s' % ("%s-dropouts.html" % run_id,
+            html_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"%s-dropouts.html" % run_id),
                                         os.path.join(self.DEST_PATH, "reports/%s" % run_id))
             os.system(html_cmd)
 
-        sc_cp_cmd = 'cp -f %s %s' % ("sc_filtered_variants.tsv",
+        sc_cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"sc_filtered_variants.tsv"),
                                     os.path.join(self.DEST_PATH, "reports/%s/%s_SC_Variants.tsv" %
                                                 (run_id, run_id)))
         os.system(sc_cp_cmd)
 
         if os.path.exists("sc2_filtered_variants.tsv"):
-            sc2_cp_cmd = 'cp -f %s %s' % ("sc2_filtered_variants.tsv",
+            sc2_cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"sc2_filtered_variants.tsv"),
                                         os.path.join(self.DEST_PATH, "reports/%s/%s_SC2_Variants.tsv" %
                                                     (run_id, run_id)))
             os.system(sc2_cp_cmd)
@@ -430,7 +435,7 @@ class myeloseq(object):
             run_id = df.iloc[0,0]
             logger.info("run ID: %s"%run_id)
             # Create a Pandas XlsxWriter engine.
-            writer = pd.ExcelWriter("%s.xlsx"%run_id, engine='xlsxwriter')
+            writer = pd.ExcelWriter(os.path.join(self.MYELOSEQ_HOME,"%s.xlsx"%run_id), engine='xlsxwriter')
             df.to_excel(writer, sheet_name='DNA', index=False)
             workbook = writer.book
 
@@ -883,13 +888,13 @@ class myeloseq(object):
                 sc_df = df.loc[df['Sample'] == sc_sample_name]
                 sc_df['Read Counts'] = sc_df.apply(lambda x: 'NA' if (x['Type'] == "SNV" or x['Type'] == "INDEL") else x['Read Counts'], axis=1)
                 sc_df['Read/M'] = sc_df.apply(lambda x: 'NA' if (x['Type'] == "SNV" or x['Type'] == "INDEL") else x['Read/M'], axis=1)
-                sc_df.to_csv("sc_filtered_variants.tsv", index = False, sep = "\t")
+                sc_df.to_csv(os.path.join(self.MYELOSEQ_HOME, "sc_filtered_variants.tsv"), index = False, sep = "\t")
                 if sc2_sample_name is not None:
                     sc2_df = df.loc[df['Sample'] == sc2_sample_name]
                     if not sc2_df.empty:
                         sc2_df['Read Counts'] = sc2_df.apply(lambda x: 'NA' if (x['Type'] == "SNV" or x['Type'] == "INDEL") else x['Read Counts'], axis=1)
                         sc2_df['Read/M'] = sc2_df.apply(lambda x: 'NA' if (x['Type'] == "SNV" or x['Type'] == "INDEL") else x['Read/M'], axis=1)
-                        sc2_df.to_csv("sc2_filtered_variants.tsv", index = False, sep = "\t")
+                        sc2_df.to_csv(os.path.join(self.MYELOSEQ_HOME,"sc2_filtered_variants.tsv"), index = False, sep = "\t")
                 sample_df = df.loc[~(df['Sample'].isin([sc_sample_name,sc2_sample_name]))]
                 # sample_df.to_csv("sample_df.csv",index=False, sep=",")
                 sample_df['Exon'] = sample_df['Exon'].apply(self.clean_exon)
@@ -906,7 +911,7 @@ class myeloseq(object):
                 add_df = add_df[['Sample','BC','Locus','Genes','Type','Exon','Transcript','Coding','Variant.Effect',
                                  'Genotype','Info','Length','Frequency','Amino.Acid.Change','AA','Coverage']]
                 print(add_df.head(3).to_string())
-                add_df.to_csv("%s.csv" % run_id, index=False, sep=",")
+                add_df.to_csv(os.path.join(self.MYELOSEQ_HOME,"%s.csv" % run_id), index=False, sep=",")
                 self._dropout.workbook = self.workbook
                 self._dropout.start()
                 # Copy files over to the share drive
