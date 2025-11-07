@@ -87,7 +87,7 @@ process_SC_control <- function(x) {
 }
 #QCplot = list(DNAQC, RNAQC)
 QCplot = lapply(QC_file.list, process_SC_control)
-pdf(paste("Oncomine-Solid-SC-QC-",run_id,".pdf",sep=""))
+pdf(paste(wd, "/Oncomine-Solid-SC-QC-",run_id,".pdf",sep=""))
 QCplot
 dev.off()
 
@@ -133,17 +133,17 @@ res.targeloci<-subset(distinct(data0), Locus  %in% snps)
 data.e<-spread(res.targeloci, Sample, X..Frequency)
 data.e[is.na(data.e)] <- 0
 
-write.csv(data.e, file=paste("QC-SNPs-final-",run_id,".csv",sep=""), row.names=FALSE)
-write.csv(combined_final, file=paste("combined_final_",run_id,".csv",sep=""), row.names=FALSE)
+write.csv(data.e, file=paste(wd, "/QC-SNPs-final-",run_id,".csv",sep=""), row.names=FALSE)
+write.csv(combined_final, file=paste(wd, "/combined_final_",run_id,".csv",sep=""), row.names=FALSE)
 
 imbalancefusion<-subset(combined_final,  (grepl(glob2rx("5p3pAssays") , X.rowtype.) )
                         & (as.numeric(X.INFO.1.5P_3P_ASSAYS.) > 0)
                         & !(X.call. == "NEG") & !(X.call. == "NOCALL"))
-write.csv(imbalancefusion, file=paste("imbalancefusion_final_",run_id,".csv",sep=""), row.names=FALSE)
+write.csv(imbalancefusion, file=paste(wd, "/imbalancefusion_final_",run_id,".csv",sep=""), row.names=FALSE)
 
 # expcontrol QC
 expcontrol<-subset(combined_final,  (grepl(glob2rx("ExprControl") , X.rowtype.) ))
-write.csv(expcontrol, file=paste("expcontrol_",run_id,".csv",sep=""), row.names=FALSE)
+write.csv(expcontrol, file=paste(wd, "/expcontrol_",run_id,".csv",sep=""), row.names=FALSE)
 
 #Read.Counts
 expQC<- ggplot(expcontrol, aes(y=log2(as.numeric(as.character(X.INFO...READ_COUNT.))), x=Sample, color=Sample)) +
@@ -157,7 +157,7 @@ expQC<- ggplot(expcontrol, aes(y=log2(as.numeric(as.character(X.INFO...READ_COUN
   guides(col = guide_legend ( ncol=1 )) +
   theme(legend.text=element_text(size=7))
 
-pdf(paste("Case_Expression_Control_ONC_Solid_QC_",run_id,".pdf",sep=""))
+pdf(paste(wd, "/Case_Expression_Control_ONC_Solid_QC_",run_id,".pdf",sep=""))
 expQC
 dev.off()
 
@@ -191,7 +191,7 @@ combined_tsv <- distinct(filtered_result)
 combined_tsv <- as.data.frame(sapply(filtered_result, function(x) gsub("\"", "", x)))
 biallelicdata<-subset(combined_tsv, (grepl("?|p", protein, fixed = TRUE))
                       & (filter == "PASS") & (type %in% c("MNV","SNV","INDEL,MNV","INDEL","INDEL,SNV")))
-write.csv(biallelicdata, file=paste("biallelicdata-final-",run_id,".csv",sep=""), row.names=FALSE)
+write.csv(biallelicdata, file=paste(wd,"/biallelicdata-final-",run_id,".csv",sep=""), row.names=FALSE)
 #added snp check
 set2 <- as.data.frame(pivot_wider(
   res.targeloci,
@@ -247,10 +247,10 @@ get_plot <- function(data, runID1, runID2) { # current run itself
     coord_fixed() 
 }
 
-pdf(paste0("snps_Comparison_",run_id,".pdf"))
+pdf(paste0(wd,"/snps_Comparison_",run_id,".pdf"))
 get_plot(data=reformat_data(data1=set2),runID1 = run_id,runID2 = run_id)
 dev.off()
 
 # remove empty 
-if (file.exists("./Rplots.pdf")) 
-  file.remove("./Rplots.pdf")
+if (file.exists(paste0(wd,"/Rplots.pdf"))) 
+  file.remove(paste0(wd,"/Rplots.pdf"))
