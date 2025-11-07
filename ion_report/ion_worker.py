@@ -17,6 +17,7 @@ import urllib3
 import shutil
 import sys
 import zipfile
+import subprocess
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning) #disable warnings
 
 from dropout_onco_worker import dropout
@@ -256,8 +257,10 @@ class oncomine_solid(object):
         From the unzipped directory, locate and return the three files (tsv, vcf, oncomine tsv).
         or (None, None, None) if not found
         """
-        temp_dir = "temp"
-        # os.makedirs(temp_dir, exist_ok=True)
+        temp_dir = os.path.join(self.HOME_DIR,"temp")
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+        os.makedirs(temp_dir, exist_ok=True)
         temp_zip = self.download_zip(sample)
         print(f"temp zip is {temp_zip}")
         # Step 1: unzip temp.zip into temp_dir
@@ -273,7 +276,7 @@ class oncomine_solid(object):
                     break
             if nested_zip:
                 print(f"Copying files {nested_zip} into {self.DEST_PATH}")
-                shutil.copy(nested_zip, os.path.join(self.DEST_PATH, "downloads"))
+                shutil.copyfile(nested_zip, os.path.join(self.DEST_PATH, "downloads", os.path.basename(nested_zip)))
                 break
         if not nested_zip:
             raise FileNotFoundError("No nested zip found in temp.zip")
@@ -300,9 +303,10 @@ class oncomine_solid(object):
 
         # Step 5: copy that subdir to downloads_dir
         target_dir = self.VAR_DIR
-        shutil.copytree(
-            target_subdir,
-            os.path.join(target_dir, os.path.basename(target_subdir)))
+        dest_path = os.path.join(self.VAR_DIR, os.path.basename(target_subdir))
+        if os.path.exists(dest_path):
+            shutil.rmtree(dest_path)
+        shutil.copytree(target_subdir, dest_path)
 
         # Step 6: clean up
         os.remove(temp_zip)
@@ -313,7 +317,7 @@ class oncomine_solid(object):
         sample_pair=os.path.basename(target_subdir)
         file_path = os.path.join(self.VAR_DIR,sample_pair)
         return glob.glob(os.path.join(file_path, "%s*-full.tsv" % sample_pair))[0],\
-            glob.glob(os.path.join(file_path, "%s*_Non-Filtered_*.vcf" %sample_pair))[0], \
+            glob.glob(os.path.join(file_path, "%s*_Non-Filtered_*.vcf" %sample_pair))[0]
             #glob.glob(os.path.join(file_path, "%s*_Non-Filtered_*-oncomine.tsv" % sample_pair))[0]
 
     # adding BAM downloading 
@@ -387,46 +391,72 @@ class oncomine_solid(object):
         os.system(rm_downloads_cmd)
 
     def copy_files(self, run_id):
+
+        rscript1 = os.path.join(self.HOME_DIR, "Oncosolid_QC_plot.R")
+        rscript2 = os.path.join(self.HOME_DIR, "MGON-gene_coverage_plots.R")
+        pyscript = os.path.join(self.HOME_DIR, "MAPD_Oncomine.py")
+
         logger.info("Generating QC plots...")
-        QC_plot_cmd = "Rscript Oncosolid_QC_plot.R " + self.HOME_DIR
-        os.system(QC_plot_cmd)
 
-        coverage_cmd = "Rscript MGON-gene_coverage_plots.R " + run_id + " " + self.conf_file
-        os.system(coverage_cmd)
+        # QC plots
+        QC_plot_cmd = [
+            "Rscript",
+            rscript1,
+            self.HOME_DIR
+        ]
+        subprocess.run(QC_plot_cmd, check=True)
 
-        MAPD_cmd = "python3 MAPD_Oncomine.py -r " + run_id + " -i " + self.DEST_PATH + "/dropoff" + " -o " + self.HOME_DIR + " -c " + self.conf_file
-        os.system(MAPD_cmd)
+        # Coverage plot
+        coverage_cmd = [
+            "Rscript",
+            rscript2,
+            run_id,
+            self.conf_file
+        ]
+        subprocess.run(coverage_cmd, check=True)
 
-        logger.info("running coverage script...")
-        logger.info("Copying the QC plots over to the Z drive...")
+        # MAPD calculation
+        MAPD_cmd = [
+            "python3",
+            pyscript,
+            "-r", run_id,
+            "-i", os.path.join(self.DEST_PATH, "dropoff"),
+            "-o", self.HOME_DIR,
+            "-c", self.conf_file
+        ]
+        subprocess.run(MAPD_cmd, check=True)
+
+        logger.info("QC plot, coverage plot, and MAPD calculation completed.")
+
+        logger.info("Copying files and QC plots over to the Z drive...")
 
         reports_dir = os.path.join(self.DEST_PATH, "reports/%s" % run_id)
         if not os.path.exists(reports_dir):
             mkdir_cmd = 'mkdir -p %s' % reports_dir
             os.system(mkdir_cmd)
 
-        plot_cp_cmd = 'cp -f %s %s' % ("*.pdf", reports_dir)
+        plot_cp_cmd = 'cp -f %s %s' % (os.path.join(self.HOME_DIR,"*.pdf"), reports_dir)
         os.system(plot_cp_cmd)
 
-        csv_cp_cmd = 'cp -f %s %s' % ("*.csv", reports_dir)
+        csv_cp_cmd = 'cp -f %s %s' % (os.path.join(self.HOME_DIR,"*.csv"), reports_dir)
         os.system(csv_cp_cmd)
 
         logger.info("Copying the report over to the Z drive")
-        cp_cmd = 'cp -f %s %s' % ("%s.xlsx" % run_id, reports_dir)
+        cp_cmd = 'cp -f %s %s' % (os.path.join(self.HOME_DIR,"%s.xlsx" % run_id), reports_dir)
         os.system(cp_cmd)
 
-        cp_csv_cmd = 'cp -f %s %s' % ("%s.csv" % run_id, reports_dir)
+        cp_csv_cmd = 'cp -f %s %s' % (os.path.join(self.HOME_DIR,"%s.csv" % run_id), reports_dir)
         os.system(cp_csv_cmd)
 
         if os.path.exists("%s-dropouts.html" % run_id):
-            html_cmd = 'cp -f %s %s' % ("%s-dropouts.html" % run_id, reports_dir)
+            html_cmd = 'cp -f %s %s' % (os.path.join(self.HOME_DIR,"%s-dropouts.html" % run_id), reports_dir)
             os.system(html_cmd)
 
-        cp_cmd = 'cp -f %s %s' % ("sc_filtered_variants.tsv",
+        cp_cmd = 'cp -f %s %s' % (os.path.join(self.HOME_DIR,"sc_filtered_variants.tsv"),
                                 os.path.join(reports_dir, "%s_SC_Variants.tsv" % run_id))
         os.system(cp_cmd)
 
-        cp2_cmd = 'cp -f %s %s' % ("sc2_filtered_variants.tsv",
+        cp2_cmd = 'cp -f %s %s' % (os.path.join(self.HOME_DIR,"sc2_filtered_variants.tsv"),
                                 os.path.join(reports_dir, "%s_SC2_Variants.tsv" % run_id))
         os.system(cp2_cmd)
 
@@ -456,7 +486,7 @@ class oncomine_solid(object):
             run_id = df.iloc[0,0]
             logger.info("run ID: %s"%run_id)
             # Create a Pandas XlsxWriter engine.
-            writer = pd.ExcelWriter("%s.xlsx"%run_id, engine='xlsxwriter')
+            writer = pd.ExcelWriter(os.path.join(self.HOME_DIR, "%s.xlsx"%run_id), engine='xlsxwriter')
             df.to_excel(writer, sheet_name='DNA', index=False)
             workbook = writer.book
             #format workbook rows/cells
@@ -753,6 +783,10 @@ class oncomine_solid(object):
             logger.info(self.workbook)
             header = pd.read_excel(self.workbook, engine='openpyxl', sheet_name='DNA', nrows=1, skiprows=2)
             run_id = list(header.columns.values)[2].replace("-DNA","")
+            # safety method to not run a repeated run in case network drive system issue
+            if run_id in os.listdir(os.path.join(self.DEST_PATH, "reports")):
+                logger.info(f"Run {run_id} already exists under reports directory, please check your record and rename previous run dir if intended to rerun.")
+                return
             sample_sheet = pd.read_excel(self.workbook, engine='openpyxl', sheet_name='DNA', skiprows=5)
             sample_sheet = sample_sheet.dropna(subset=[sample_sheet.columns[0]], how='all')
             sample_sheet['sample_id'] = sample_sheet['Accession #'].astype(str) + "-" + sample_sheet['DNA #'].astype(str)
@@ -783,14 +817,14 @@ class oncomine_solid(object):
                 sc_df = df.loc[df['Sample'] == sc_sample_name]
                 sc_df['Read Counts'] = sc_df.apply(lambda x: 'NA' if (x['Type'] == "SNV" or x['Type'] == "INDEL") else x['Read Counts'], axis=1)
                 sc_df['Read/M'] = sc_df.apply(lambda x: 'NA' if (x['Type'] == "SNV" or x['Type'] == "INDEL") else x['Read/M'], axis=1)
-                sc_df.to_csv("sc_filtered_variants.tsv", index = False, sep = "\t")
+                sc_df.to_csv(os.path.join(self.HOME_DIR, "sc_filtered_variants.tsv"), index = False, sep = "\t")
                 sample_df = df.copy()
                 if sc2_sample_name is not  None:
                     sc2_df = df.loc[df['Sample'] == sc2_sample_name]
                     if not sc2_df.empty:
                         sc2_df['Read Counts'] = sc2_df.apply(lambda x: 'NA' if (x['Type'] == "SNV" or x['Type'] == "INDEL") else x['Read Counts'], axis=1)
                         sc2_df['Read/M'] = sc2_df.apply(lambda x: 'NA' if (x['Type'] == "SNV" or x['Type'] == "INDEL") else x['Read/M'], axis=1)
-                        sc2_df.to_csv("sc2_filtered_variants.tsv", index = False, sep = "\t")
+                        sc2_df.to_csv(os.path.join(self.HOME_DIR, "sc2_filtered_variants.tsv"), index = False, sep = "\t")
                         sample_df = df.loc[df['Sample'] != sc2_sample_name]
                 sample_df = sample_df.loc[sample_df['Sample'] != sc_sample_name]
                 # sample_df = df.loc[df['Sample'] != sc2_sample_name]
@@ -826,7 +860,7 @@ class oncomine_solid(object):
                 add_df = add_df.infer_objects(copy=False)
                 add_df[cols]=add_df[cols].fillna(0)
                 add_df[['Coverage']] = add_df[['Coverage']].astype(int)
-                add_df.to_csv("%s.csv" % run_id, index=False, sep=",")
+                add_df.to_csv(os.path.join(self.HOME_DIR,"%s.csv" % run_id), index=False, sep=",")
                 try:
                     self._dropout.workbook = self.workbook
                     self._dropout.start()
