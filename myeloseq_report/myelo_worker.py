@@ -864,6 +864,10 @@ class myeloseq(object):
             logger.info(self.workbook)
             header = pd.read_excel(self.workbook, engine='openpyxl', sheet_name='DNA', nrows=1, skiprows=2)
             run_id = list(header.columns.values)[2].replace("-DNA","")
+            # safety method to not run a repeated run in case network drive system issue
+            if run_id in os.listdir(os.path.join(self.DEST_PATH, "reports")):
+                logger.info(f"Run {run_id} already exists under reports directory, please check your record and rename previous run dir if intended to rerun.")
+                return
             sample_sheet = pd.read_excel(self.workbook, engine='openpyxl', sheet_name='DNA', skiprows=5)
             sample_sheet = sample_sheet.dropna(subset=[sample_sheet.columns[0]], how='all')
             sample_sheet['sample_id'] = sample_sheet['Accession #'] + "-" + sample_sheet['DNA #']
