@@ -26,21 +26,23 @@ class Watcher:
 
 
 class Handler(FileSystemEventHandler):
-    @staticmethod
-    def on_any_event(event):
+    def __init__(self, config_path):
+        self.config_path = config_path
+
+    def on_any_event(self, event):
         if event.is_directory:
-            return None
+            return
 
-        elif event.event_type == 'created':
-            # Take any action here when a file is first created.
-            print("Received created event - %s." % event.src_path)
+        if event.event_type == "created":
+            print(f"Received created event - {event.src_path}")
             time.sleep(5)
-            ion_worker = oncomine_solid(self.config_path)
-            ion_worker.workbook = event.src_path
-            ion_worker.start()
-            del ion_worker
+            oncomine_worker = oncomine_solid(self.config_path)
+            oncomine_worker.workbook = event.src_path
+            oncomine_worker.start()
+            del oncomine_worker
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     if len(sys.argv) != 3:
         print("Usage: ion_watchdog.py <config_path> <directory_to_watch>")
         sys.exit(1)
@@ -50,4 +52,3 @@ if __name__ == '__main__':
 
     w = Watcher(directory_to_watch, config_path)
     w.run()
-
