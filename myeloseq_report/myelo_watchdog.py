@@ -6,7 +6,7 @@ import time
 from watchdog.observers.polling import PollingObserver
 from watchdog.events import FileSystemEventHandler
 from myelo_worker import myeloseq
-
+from datetime import datetime
 
 class Watcher:
     def __init__(self, directory_to_watch, config_path):
@@ -35,12 +35,14 @@ class Handler(FileSystemEventHandler):
             return
 
         if event.event_type == "created":
-            print(f"Received created event - {event.src_path}")
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            print(f"[{timestamp}] Received created event - {event.src_path}")
+            #print(f"Received created event - {event.src_path}")
             time.sleep(5)
-            myelo_worker = myeloseq(self.config_path)
-            myelo_worker.workbook = event.src_path
-            myelo_worker.start()
-            del myelo_worker
+            #myelo_worker = myeloseq(self.config_path)
+            #myelo_worker.workbook = event.src_path
+            #myelo_worker.start()
+            #del myelo_worker
 
 
 if __name__ == "__main__":
