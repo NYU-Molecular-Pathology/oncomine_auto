@@ -155,8 +155,9 @@ class myeloseq(object):
                     headers=headers,
                     params=params,
                     verify=False,
-                    timeout=30,
+                    timeout=180,
                 )
+                print(r.status_code, r.text)
                 if r.status_code == 200:
                     last_ok = r
                     i += 1
@@ -328,6 +329,13 @@ class myeloseq(object):
             print(f"Failed to download {sample}: {e}")
             return None
 
+    def index_bam(self, bam_path):
+        """Generate a .bai index for IGV viewing."""
+        bai_path = bam_path + ".bai"
+
+        subprocess.run(["samtools", "index", bam_path, bai_path], check=True)
+        return bai_path
+
     def fetch_and_download_bams(self, sample: str, run_id: str):
         """
         Fetch inputBam links for an analysis and download the BAM files.
@@ -356,13 +364,24 @@ class myeloseq(object):
                         bam_url = input_bams[0]  # usually one inputBam
                         bam_url = bam_url.replace(
             "https://DPZNKD3:443", f"https://{self.HOST}", 1)
-                        bam_path = self.download_bam_file(bam_url, sample_name, run_id)
-                        results[sample_name] = bam_path
+                        downloaded_bam = self.download_bam_file(bam_url, sample_name, run_id)
+                        # generate bai
+                        if downloaded_bam:
+                            print(f"Indexing BAM for {sample_name}")
+                            downloaded_bai = self.index_bam(downloaded_bam)
+                        else:
+                            downloaded_bai = None
+
+                        results[sample_name] = {
+                            "bam": downloaded_bam,
+                            "bai": downloaded_bai
+                        } # return this simply for debugging in future 
             return results
         
         except requests.RequestException as e:
             print(f"Error fetching input BAMs: {e}")
             return {}
+
 
     def clean_up(self):
         rm_downloads_cmd = 'rm -f %s/*.zip' % os.path.join(self.DEST_PATH, "downloads")
@@ -393,7 +412,7 @@ class myeloseq(object):
         cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir, "%s.xlsx" % run_id), os.path.join(self.DEST_PATH, "reports/%s" % run_id))
         os.system(cp_cmd)
 
-        if os.path.exists("%s-dropouts.html" % run_id):
+        if os.path.exists(os.path.join(script_dir,"%s-dropouts.html" % run_id)):
             html_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"%s-dropouts.html" % run_id),
                                         os.path.join(self.DEST_PATH, "reports/%s" % run_id))
             os.system(html_cmd)
@@ -403,7 +422,7 @@ class myeloseq(object):
                                                 (run_id, run_id)))
         os.system(sc_cp_cmd)
 
-        if os.path.exists("sc2_filtered_variants.tsv"):
+        if os.path.exists(os.path.join(script_dir,"sc2_filtered_variants.tsv")):
             sc2_cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"sc2_filtered_variants.tsv"),
                                         os.path.join(self.DEST_PATH, "reports/%s/%s_SC2_Variants.tsv" %
                                                     (run_id, run_id)))
