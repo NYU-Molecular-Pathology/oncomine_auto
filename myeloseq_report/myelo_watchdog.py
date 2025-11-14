@@ -39,10 +39,10 @@ class Handler(FileSystemEventHandler):
             print(f"[{timestamp}] Received created event - {event.src_path}")
             #print(f"Received created event - {event.src_path}")
             time.sleep(5)
-            #myelo_worker = myeloseq(self.config_path)
-            #myelo_worker.workbook = event.src_path
-            #myelo_worker.start()
-            #del myelo_worker
+            myelo_worker = myeloseq(self.config_path)
+            myelo_worker.workbook = event.src_path
+            myelo_worker.start()
+            del myelo_worker
 
 
 if __name__ == "__main__":
