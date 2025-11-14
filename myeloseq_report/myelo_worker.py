@@ -314,7 +314,16 @@ class myeloseq(object):
         run_path = os.path.join(self.BAM_DIR, folder_name)
         os.makedirs(run_path, exist_ok=True) 
 
-        out_path = os.path.join(run_path, f"{sample}.bam")
+        raw_bam_name = url.rsplit("/", 1)[-1]
+
+        if not raw_bam_name.endswith(".bam"):
+            raise ValueError(f"URL does not point to a .bam file: {raw_bam_name}")
+        
+        if not raw_bam_name.startswith("IonXpress"):
+            raise ValueError(f"BAM ID must start with 'IonXpress': {raw_bam_id}")
+        
+        raw_bam_id = raw_bam_name[:-len("_rawlib.bam")]
+        out_path = os.path.join(run_path, f"{raw_bam_id}_{sample}.bam")
         
         try:
             with requests.get(url, headers=headers, stream=True, verify=False, timeout=600) as r:

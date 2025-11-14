@@ -322,7 +322,7 @@ class oncomine_solid(object):
             #glob.glob(os.path.join(file_path, "%s*_Non-Filtered_*-oncomine.tsv" % sample_pair))[0]
 
     # adding BAM downloading 
-    def download_bam_file(self, url:str, sample: str, run_id:str):
+    def download_bam_file(self, url:str, sample: str, run_id:str, chip_number: int):
         """
         Download a BAM file from the given inputBam URL and save it as {sample_name}.bam.
         """
@@ -332,10 +332,20 @@ class oncomine_solid(object):
             "Connection": "close"
         }
         
-        run_path = os.path.join(self.BAM_DIR, run_id)
+        folder_name = f"{run_id}-{chip_number}"
+        run_path = os.path.join(self.BAM_DIR, folder_name)
         os.makedirs(run_path, exist_ok=True) 
 
-        out_path = os.path.join(run_path, f"{sample}.bam")
+        raw_bam_name = url.rsplit("/", 1)[-1]
+
+        if not raw_bam_name.endswith(".bam"):
+            raise ValueError(f"URL does not point to a .bam file: {raw_bam_name}")
+        
+        if not raw_bam_name.startswith("IonXpress"):
+            raise ValueError(f"BAM ID must start with 'IonXpress': {raw_bam_id}")
+        
+        raw_bam_id = raw_bam_name[:-len("_rawlib.bam")]
+        out_path = os.path.join(run_path, f"{raw_bam_id}_{sample}.bam")
         
         try:
             with requests.get(url, headers=headers, stream=True, verify=False, timeout=600) as r:
@@ -357,7 +367,7 @@ class oncomine_solid(object):
         subprocess.run(["samtools", "index", bam_path, bai_path], check=True)
         return bai_path
 
-    def fetch_and_download_bams(self, sample: str, run_id: str):
+    def fetch_and_download_bams(self, sample: str, run_id: str, chip_number: int):
         """
         Fetch inputBam links for an analysis and download the BAM files.
         
@@ -385,7 +395,7 @@ class oncomine_solid(object):
                         bam_url = input_bams[0]  # usually one inputBam
                         bam_url = bam_url.replace(
             "https://DPZNKD3:443", f"https://{self.HOST}", 1)
-                        downloaded_bam = self.download_bam_file(bam_url, sample_name, run_id)
+                        downloaded_bam = self.download_bam_file(bam_url, sample_name, run_id, chip_number)
                         # generate bai
                         if downloaded_bam:
                             print(f"Indexing BAM for {sample_name}")
@@ -885,13 +895,20 @@ class oncomine_solid(object):
                 except:
                     pass
                 self.write_to_excel(sample_df)
-                for sample in list(sample_sheet['sample_id']):
+                for _, row in sample_sheet.iterrows():
+                    sample = row.get("sample_id")
+                    chip_number = row.get("Chip #")
+
+                    if not sample or str(sample).lower() == "nan":
+                        continue
+
                     try:
-                        if sample == "" or sample == None or str(sample) == 'nan': continue
-                        logger.info('Downloading %s sample BAM', sample)
-                        self.fetch_and_download_bams(sample, run_id)
-                    except:
-                        pass
+                        chip_number = int(chip_number)
+                        logger.info("Downloading %s sample BAM (Chip %s)", sample, chip_number)
+                        self.fetch_and_download_bams(sample, run_id, chip_number)
+                    except Exception as e:
+                        logger.error(f"Error processing sample {sample}: {e}")
+                        
                 logger.info('Took %s seconds to process samples', time() - ts)
         except Exception as e:
              logger.error(str(e))
