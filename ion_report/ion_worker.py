@@ -178,8 +178,9 @@ class oncomine_solid(object):
                     headers=headers,
                     params=params,
                     verify=False,
-                    timeout=30,
+                    timeout=180,
                 )
+                print(f"status code is {r.status_code}")
                 if r.status_code == 200:
                     last_ok = r
                     i += 1
@@ -349,6 +350,13 @@ class oncomine_solid(object):
             print(f"Failed to download {sample}: {e}")
             return None
 
+    def index_bam(self, bam_path):
+        """Generate a .bai index for IGV viewing."""
+        bai_path = bam_path + ".bai"
+
+        subprocess.run(["samtools", "index", bam_path, bai_path], check=True)
+        return bai_path
+
     def fetch_and_download_bams(self, sample: str, run_id: str):
         """
         Fetch inputBam links for an analysis and download the BAM files.
@@ -377,13 +385,24 @@ class oncomine_solid(object):
                         bam_url = input_bams[0]  # usually one inputBam
                         bam_url = bam_url.replace(
             "https://DPZNKD3:443", f"https://{self.HOST}", 1)
-                        bam_path = self.download_bam_file(bam_url, sample_name, run_id)
-                        results[sample_name] = bam_path
+                        downloaded_bam = self.download_bam_file(bam_url, sample_name, run_id)
+                        # generate bai
+                        if downloaded_bam:
+                            print(f"Indexing BAM for {sample_name}")
+                            downloaded_bai = self.index_bam(downloaded_bam)
+                        else:
+                            downloaded_bai = None
+
+                        results[sample_name] = {
+                            "bam": downloaded_bam,
+                            "bai": downloaded_bai
+                        } # return this simply for debugging in future 
             return results
         
         except requests.RequestException as e:
             print(f"Error fetching input BAMs: {e}")
             return {}
+
 
 
     def clean_up(self):
@@ -448,9 +467,8 @@ class oncomine_solid(object):
         cp_csv_cmd = 'cp -f %s %s' % (os.path.join(self.HOME_DIR,"%s.csv" % run_id), reports_dir)
         os.system(cp_csv_cmd)
 
-        if os.path.exists("%s-dropouts.html" % run_id):
-            html_cmd = 'cp -f %s %s' % (os.path.join(self.HOME_DIR,"%s-dropouts.html" % run_id), reports_dir)
-            os.system(html_cmd)
+        html_cmd = 'cp -f %s %s' % (os.path.join(self.HOME_DIR,"%s-dropouts.html" % run_id), reports_dir)
+        os.system(html_cmd)
 
         cp_cmd = 'cp -f %s %s' % (os.path.join(self.HOME_DIR,"sc_filtered_variants.tsv"),
                                 os.path.join(reports_dir, "%s_SC_Variants.tsv" % run_id))
