@@ -897,7 +897,12 @@ class oncomine_solid(object):
                 self.write_to_excel(sample_df)
                 for _, row in sample_sheet.iterrows():
                     sample = row.get("sample_id")
-                    chip_number = row.get("Chip #")
+                    chip_col = next((col for col in row.keys() if col.startswith("Chip #")), None)
+
+                    if chip_col is None:
+                        raise ValueError(f"No Chip # column found in row: {row}")
+
+                    chip_number = row.get(chip_col)
 
                     if not sample or str(sample).lower() == "nan":
                         continue
