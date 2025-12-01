@@ -15,8 +15,9 @@ conf <- read.ini(config_path)
 output_path = conf$MYELOSEQ$DEST_PATH
 work_dir = conf$MYELOSEQ$MYELOSEQ_HOME
 dropout_dir = conf$MYELOSEQ$DROPOUT_DIR
+worksheet_dir = conf$MYELOSEQ$DIRECTORY_TO_WATCH
 #
-PATH_Samplesheet <- paste0(output_path,"/worksheet.dropoffs/",
+PATH_Samplesheet <- paste0(worksheet_dir,"/",
                            runID, ".xlsm")
 # clean up samplesheet
 samplesheet <- read_excel(PATH_Samplesheet, sheet = 1, skip = 5)
