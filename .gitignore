@@ -231,3 +231,4 @@ nohup.out
 *.pdf
 *.tsv
 *.pdf
+*.conf
