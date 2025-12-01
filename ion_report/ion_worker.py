@@ -37,6 +37,7 @@ class oncomine_solid(object):
         self.VAR_DIR = config['SOLID']['VAR_DIR']
         self.WORK_DIR = config['SOLID']['WORK_DIR']
         self.DEST_PATH = config['SOLID']['DEST_PATH']
+        self.DROPOFF = config['SOLID']['DIRECTORY_TO_WATCH']
         self.AA_CODES = config['DEFAULT']['AA_CODES']
         self.INCL_FUNCS = config['SOLID']['INCL_FUNCS'].split(",")
         self.LOCATIONS = config['SOLID']['LOCATIONS'].split(",")
@@ -449,7 +450,7 @@ class oncomine_solid(object):
             "python3",
             pyscript,
             "-r", run_id,
-            "-i", os.path.join(self.DEST_PATH, "dropoff"),
+            "-i", os.path.join(self.DROPOFF),
             "-o", self.HOME_DIR,
             "-c", self.conf_file
         ]

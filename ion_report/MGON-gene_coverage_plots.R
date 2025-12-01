@@ -19,6 +19,7 @@ conf <- read.ini(config_path)
 # Access values like a list
 onco_InDir <- conf$SOLID$DEST_PATH
 outFolder <- conf$SOLID$HOME_DIR
+dropoffDir <- conf$SOLID$DIRECTORY_TO_WATCH
 xlsDropOff <- "amplicon.dropout.dropoff"
 
 LoadLibrary <- function(pkgName) {
@@ -191,14 +192,14 @@ ReadFileValues <- function(xlsFiLi, runsToDo, outFolder) {
     }
 }
 
-GetFileList <- function(specificRun = NULL, onco_InDir, xlsDropOff, outFolder) {
+GetFileList <- function(specificRun = NULL, onco_InDir, xlsDropOff, dropoffDir, outFolder) {
     xlsFiLi <- dir(path = file.path(onco_InDir, xlsDropOff), pattern = ".xls", full.names = T)
-    runsToDo <- GetRunsList(file.path(onco_InDir, "dropoff"), specificRun)
+    runsToDo <- GetRunsList(dropoffDir, specificRun)
     ReadFileValues(xlsFiLi, runsToDo, outFolder)
 }
 
 LoadPackageLibs()
 
-GetFileList(specificRun, onco_InDir, xlsDropOff, outFolder)
+GetFileList(specificRun, onco_InDir, xlsDropOff, dropoffDir, outFolder)
 if (file.exists(paste0(outFolder, "/Rplots.pdf"))) 
   file.remove(paste0(outFolder, "/Rplots.pdf"))
