@@ -39,6 +39,8 @@ To run a run manually, depending on the run is processed by IR2 or IR3
 __Oncomine__  
 ```
 # log in to the production VM
+# load oncomine environment
+conda activate ion_env
 cd ~/oncomine_automation/ion_report
 # if the run is on IR3
 python3 ion_runner.py ~/oncomine_auto/ion_config_IR3.conf /mnt/Z_drive/Molecular/IonTorrent/oncomine/IR3.dropoff/<runid>.xlsm
@@ -48,6 +50,8 @@ python3 ion_runner.py ~/oncomine_auto/ion_config_IR2.conf /mnt/Z_drive/Molecular
 __Myeloseqer__  
 ```
 # log in to the production VM
+# load myeloseqer environment
+conda activate myeloseq_env
 cd ~/oncomine_automation/myeloseq_report
 # if the run is on IR3
 python3 myelo_runner.py ~/oncomine_auto/ion_config_IR3.conf /mnt/Z_drive/Molecular/IonTorrent/myeloseqer/IR3.dropoff/<runid>.xlsm
