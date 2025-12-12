@@ -822,17 +822,15 @@ class oncomine_solid(object):
             logger.info(sample_sheet.to_string())  # shows headers with top 5 rows
 
             sc_sample_name = list(sample_sheet['sample_id'])[0]
-            #sc2_sample_name = list(filter(lambda x: "m2-Seraseq" in x, list(sample_sheet['sample_id'])))[0]
+        
             try:
-                # sc2_sample_name = list(filter(lambda x: "o2-Seraseq" in x, list(sample_sheet['sample_id'])))[0]
-                sc2_sample_name = list(filter(lambda x: "m2-Seraseq" in x, list(sample_sheet['sample_id'])))[0]
+                sc2_sample_name = list(filter(lambda x: "o2-Seraseq" in x, list(sample_sheet['sample_id'])))[0]
                 logger.info("SC sample: %s" %sc2_sample_name)
             except IndexError:
                 sc2_sample_name = None
-                # print("No matches found for 'o2-Seraseq'")
-                print("No matches found for 'm2-Seraseq'")
+                print("No matches found for 'o2-Seraseq'")
             logger.info("SC sample: %s" %sc_sample_name)
-            logger.info("SC sample: %s" %sc2_sample_name)
+            logger.info("SC2 sample: %s" %sc2_sample_name)
             for sample, barcode, tumor_pct in zip(list(sample_sheet['sample_id']),
                                               list(sample_sheet['Bar code']),
                                               list(sample_sheet['%T'])):
