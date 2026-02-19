@@ -14,7 +14,7 @@ This workflow performs the following steps in sequence:
 
 ## Instructions to Run  
 ### Watchdog process  
-This process is currently on our production VM (@MOLAPPLPDCPVM01). Scripts located under `~/oncomine_automation/`. At the moment, all processes are protected by their `systemctl` services. You can find the details of `systemctl` under `~/.config/systemd/user/`   
+This process is currently on our production VM (@MOLAPPLPDCPVM01). Scripts located under `/apps/bi_shared/bi_pipelines/scripts/oncomine_auto`. At the moment, all processes are protected by their `systemctl` services. You can find the details of `systemctl` under `~/.config/systemd/user/`   
 ```
 # log in to production VM
 # check if processes are up do
@@ -28,6 +28,8 @@ ps axu | grep "myeloseq"
 #yangy15+  384242  0.0  0.0 2051648 79528 ?       Sl   Dec08   1:37 python -u /home/yangy15_adm/oncomine_auto/myeloseq_report/myelo_watchdog.py /home/yangy15_adm/oncomine_auto/ion_config_IR3.conf /mnt/Z_drive/Molecular/IonTorrent/myeloseqer/IR3.dropoff
 
 ```
+Check logs under `/apps/bi_shared/bi_pipelines/logs/`  
+
 ### Manual rerun  
 To run a run manually, depending on the run is processed by IR2 or IR3  
 __Oncomine__  
