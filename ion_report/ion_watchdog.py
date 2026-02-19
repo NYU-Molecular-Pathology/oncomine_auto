@@ -40,7 +40,7 @@ class Watcher:
         while True:
             time.sleep(DRIVE_KEEPALIVE_INTERVAL)
             if hit_drive_recursive(self.DIRECTORY_TO_WATCH):
-                ts = datetime.now().strftime("%H:%M")
+                ts = datetime.now().strftime("%Y-%m-%d %H:%M")
                 print(f"[{ts}] Drive OK")
             # on failure, hit_drive_recursive already logs
 
