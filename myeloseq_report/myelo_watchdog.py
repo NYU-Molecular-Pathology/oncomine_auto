@@ -5,6 +5,10 @@ import os
 import sys
 import time
 import threading
+import smtplib
+import configparser
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from watchdog.observers.polling import PollingObserver
 from watchdog.events import FileSystemEventHandler
 from myelo_worker import myeloseq
@@ -12,6 +16,40 @@ from datetime import datetime
 
 # Keep-alive interval in seconds (1 hour)
 DRIVE_KEEPALIVE_INTERVAL = 3600
+
+def send_email_notification(subject, body, smtp_server, smtp_port, sender_email, receiver_email):
+    """Send a plain-text email notification through institutional SMTP relay."""
+    if not smtp_server or not sender_email or not receiver_email:
+        print(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
+            f"Email skipped for '{subject}': SMTP settings not configured."
+        )
+        return
+
+    receiver_list = [email.strip() for email in receiver_email.split(",") if email.strip()]
+    if not receiver_list:
+        print(
+            f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] "
+            f"Email skipped for '{subject}': no valid receiver configured."
+        )
+        return
+
+    message = MIMEMultipart()
+    message["From"] = sender_email
+    message["To"] = ", ".join(receiver_list)
+    message["Subject"] = subject
+    message.attach(MIMEText(body, "plain"))
+
+    server = None
+    try:
+        server = smtplib.SMTP(smtp_server, smtp_port)
+        server.sendmail(sender_email, receiver_list, message.as_string())
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Email sent: {subject}")
+    except Exception as e:
+        print(f"[{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] Error sending email: {e}")
+    finally:
+        if server is not None:
+            server.quit()
 
 
 def hit_drive_recursive(directory):
@@ -64,6 +102,12 @@ class Watcher:
 class Handler(FileSystemEventHandler):
     def __init__(self, config_path):
         self.config_path = config_path
+        config = configparser.ConfigParser()
+        config.read(config_path)
+        self.smtp_server = config["DEFAULT"].get("SMTP_SERVER")
+        self.smtp_port = config["DEFAULT"].getint("SMTP_PORT", 25)
+        self.sender_email = config["DEFAULT"].get("SENDER_EMAIL")
+        self.receiver_email = config["DEFAULT"].get("RECEIVER_EMAIL")
 
     def on_any_event(self, event):
         if event.is_directory:
@@ -72,12 +116,51 @@ class Handler(FileSystemEventHandler):
         if event.event_type == "created":
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"[{timestamp}] Received created event - {event.src_path}")
-            #print(f"Received created event - {event.src_path}")
+            send_email_notification(
+                subject="MyeloSeq watchdog: file detected",
+                body=(
+                    f"Watchdog detected a new file and will start a run.\n\n"
+                    f"Time: {timestamp}\n"
+                    f"File: {event.src_path}\n"
+                ),
+                smtp_server=self.smtp_server,
+                smtp_port=self.smtp_port,
+                sender_email=self.sender_email,
+                receiver_email=self.receiver_email,
+            )
             time.sleep(5)
-            myelo_worker = myeloseq(self.config_path)
-            myelo_worker.workbook = event.src_path
-            myelo_worker.start()
-            del myelo_worker
+            try:
+                myelo_worker = myeloseq(self.config_path)
+                myelo_worker.workbook = event.src_path
+                myelo_worker.start()
+                send_email_notification(
+                    subject="MyeloSeq watchdog: run finished successfully",
+                    body=(
+                        f"MyeloSeq run completed successfully.\n\n"
+                        f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                        f"File: {event.src_path}\n"
+                    ),
+                    smtp_server=self.smtp_server,
+                    smtp_port=self.smtp_port,
+                    sender_email=self.sender_email,
+                    receiver_email=self.receiver_email,
+                )
+                del myelo_worker
+            except Exception as e:
+                send_email_notification(
+                    subject="MyeloSeq watchdog: run failed",
+                    body=(
+                        f"MyeloSeq run failed with an error.\n\n"
+                        f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
+                        f"File: {event.src_path}\n"
+                        f"Error: {e}\n"
+                    ),
+                    smtp_server=self.smtp_server,
+                    smtp_port=self.smtp_port,
+                    sender_email=self.sender_email,
+                    receiver_email=self.receiver_email,
+                )
+                raise
 
 
 if __name__ == "__main__":
