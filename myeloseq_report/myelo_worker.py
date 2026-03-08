@@ -966,3 +966,4 @@ class myeloseq(object):
 
         except Exception as e:
              logger.error(str(e))
+             raise
