@@ -6,6 +6,7 @@ import sys
 import time
 import threading
 import smtplib
+import traceback
 import configparser
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
@@ -153,7 +154,8 @@ class Handler(FileSystemEventHandler):
                         f"MyeloSeq run failed with an error.\n\n"
                         f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n"
                         f"File: {event.src_path}\n"
-                        f"Error: {e}\n"
+                        f"Error: {e}\n\n"
+                        f"Traceback:\n{traceback.format_exc()}"
                     ),
                     smtp_server=self.smtp_server,
                     smtp_port=self.smtp_port,
