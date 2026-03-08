@@ -916,3 +916,4 @@ class oncomine_solid(object):
                 logger.info('Took %s seconds to process samples', time() - ts)
         except Exception as e:
              logger.error(str(e))
+             raise
