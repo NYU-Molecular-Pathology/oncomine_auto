@@ -162,7 +162,6 @@ class Handler(FileSystemEventHandler):
                     sender_email=self.sender_email,
                     receiver_email=self.receiver_email,
                 )
-                raise
 
 
 if __name__ == "__main__":
