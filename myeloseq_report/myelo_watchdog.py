@@ -2,6 +2,7 @@ __author__ = "Kelsey Zhu, Yiying Yang"
 __version__ = "1.1"
 
 import os
+import re
 import sys
 import time
 import threading
@@ -14,6 +15,8 @@ from watchdog.observers.polling import PollingObserver
 from watchdog.events import FileSystemEventHandler
 from myelo_worker import myeloseq
 from datetime import datetime
+
+VALID_WORKBOOK_RE = re.compile(r"^\d{2}-MGMQ.*\.xlsm$", re.IGNORECASE)
 
 # Keep-alive interval in seconds (1 hour)
 DRIVE_KEEPALIVE_INTERVAL = 3600
@@ -115,6 +118,10 @@ class Handler(FileSystemEventHandler):
             return
 
         if event.event_type == "created":
+            filename = os.path.basename(event.src_path)
+            if not VALID_WORKBOOK_RE.match(filename):
+                return
+
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             print(f"[{timestamp}] Received created event - {event.src_path}")
             send_email_notification(
