@@ -565,20 +565,17 @@ class myeloseq(object):
                 return row['# locus'].split("_")[1]
         except:
             return row['# locus']
-
     def get_fusion_read_counts(self, row):
         try:
-            m = re.search(r'SVTYPE=([RNAExonVariant]*[Fusion]*);READ_COUNT=(.+);GENE_NAME=(.+);RPM=(.+);NORM_COUNT=(.+)',
-                            row['INFO']);
+            m = re.search(r'SVTYPE=([^;]*Fusion[^;]*);.*?READ_COUNT=([^;]+)', row['INFO'])
             return m.group(2)
         except:
             return 0
 
     def get_fusion_RPM(self, row):
         try:
-            m = re.search(r'SVTYPE=([RNAExonVariant]*[Fusion]*);READ_COUNT=(.+);GENE_NAME=(.+);RPM=(.+);NORM_COUNT=(.+)',
-                          row['INFO']);
-            return m.group(4)
+            m = re.search(r'SVTYPE=([^;]*Fusion[^;]*);.*?RPM=([^;]+)', row['INFO'])
+            return m.group(2)
         except:
             return 0
 
