@@ -106,8 +106,13 @@ class myeloseq(object):
 
     def get_ExAC_info(self, row):
         try:
-            m = re.search(r'AMAF=(.+):GMAF=(.+):EMAF=(.+)', row['5000Exomes'])
-            return "%s:%s:%s"%(m.group(1), m.group(2), m.group(3))
+            val = str(row['5000Exomes'])
+            amaf = re.search(r'AMAF=([^:]+)', val)
+            gmaf = re.search(r'GMAF=([^:]+)', val)
+            emaf = re.search(r'EMAF=([^:]+)', val)
+            return "%s:%s:%s" % (amaf.group(1) if amaf else "NA",
+                                 gmaf.group(1) if gmaf else "NA",
+                                 emaf.group(1) if emaf else "NA")
         except:
             return "NA:NA:NA"
 
@@ -396,47 +401,61 @@ class myeloseq(object):
         rm_downloads_cmd = 'rm -f %s/*.zip' % os.path.join(self.DEST_PATH, "downloads")
         os.system(rm_downloads_cmd)
 
-    def copy_files(self, run_id):
-        script_dir = self.MYELOSEQ_HOME  # directory where this Python script lives
+    def copy_tables(self, run_id):
+        script_dir = self.MYELOSEQ_HOME
+        dest = os.path.join(self.DEST_PATH, "reports/%s" % run_id)
+        os.system('mkdir -p %s' % dest)
+        logger.info("Copying the report over to the Z drive")
+        csv_cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"*.csv"), dest)
+        os.system(csv_cp_cmd)
+        cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir, "%s.xlsx" % run_id), dest)
+        os.system(cp_cmd)
+        sc_cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"sc_filtered_variants.tsv"),
+                                    os.path.join(dest, "%s_SC_Variants.tsv" % run_id))
+        os.system(sc_cp_cmd)
+        if os.path.exists(os.path.join(script_dir,"sc2_filtered_variants.tsv")):
+            sc2_cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"sc2_filtered_variants.tsv"),
+                                        os.path.join(dest, "%s_SC2_Variants.tsv" % run_id))
+            os.system(sc2_cp_cmd)
+
+    def generate_qc_plots(self, run_id):
+        script_dir = self.MYELOSEQ_HOME
         rscript1 = os.path.join(script_dir, "MyeloSeq-QC-plot.R")
         rscript2 = os.path.join(script_dir, "development_script_chrX_coverage.R")
-        
         logger.info("Generating QC plots...")
         QC_plot_cmd = ["Rscript", rscript1, self.MYELOSEQ_HOME]
         chrX_plot_cmd = ["Rscript", rscript2, run_id, self.conf_file]
-        subprocess.run(QC_plot_cmd, check=True)
-        subprocess.run(chrX_plot_cmd, check=True)
+        plot_error = None
+        try:
+            subprocess.run(QC_plot_cmd, check=True)
+        except Exception as e:
+            logger.error(str(e))
+            plot_error = e
+        try:
+            subprocess.run(chrX_plot_cmd, check=True)
+        except Exception as e:
+            logger.error(str(e))
+            plot_error = e
+        if plot_error:
+            raise plot_error
 
+    def copy_qc_plots(self, run_id):
+        script_dir = self.MYELOSEQ_HOME
+        dest = os.path.join(self.DEST_PATH, "reports/%s" % run_id)
+        os.system('mkdir -p %s' % dest)
         logger.info("Copying the QC plots over to the Z drive...")
-        mkdir_cmd = 'mkdir -p %s' % os.path.join(self.DEST_PATH, "reports/%s" % run_id)
-        os.system(mkdir_cmd)
-
-        plot_cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"*.pdf"), os.path.join(self.DEST_PATH, "reports/%s" % run_id))
+        plot_cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"*.pdf"), dest)
         os.system(plot_cp_cmd)
 
-        csv_cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"*.csv"), os.path.join(self.DEST_PATH, "reports/%s" % run_id))
-        os.system(csv_cp_cmd)
-
-        logger.info("Copying the report over to the Z drive")
-        cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir, "%s.xlsx" % run_id), os.path.join(self.DEST_PATH, "reports/%s" % run_id))
-        os.system(cp_cmd)
-
+    def copy_dropouts(self, run_id):
+        script_dir = self.MYELOSEQ_HOME
+        dest = os.path.join(self.DEST_PATH, "reports/%s" % run_id)
+        os.system('mkdir -p %s' % dest)
         if os.path.exists(os.path.join(script_dir,"%s-dropouts.html" % run_id)):
-            html_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"%s-dropouts.html" % run_id),
-                                        os.path.join(self.DEST_PATH, "reports/%s" % run_id))
+            html_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"%s-dropouts.html" % run_id), dest)
             os.system(html_cmd)
 
-        sc_cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"sc_filtered_variants.tsv"),
-                                    os.path.join(self.DEST_PATH, "reports/%s/%s_SC_Variants.tsv" %
-                                                (run_id, run_id)))
-        os.system(sc_cp_cmd)
-
-        if os.path.exists(os.path.join(script_dir,"sc2_filtered_variants.tsv")):
-            sc2_cp_cmd = 'cp -f %s %s' % (os.path.join(script_dir,"sc2_filtered_variants.tsv"),
-                                        os.path.join(self.DEST_PATH, "reports/%s/%s_SC2_Variants.tsv" %
-                                                    (run_id, run_id)))
-            os.system(sc2_cp_cmd)
-
+    def copy_files(self, run_id):
         # copy variant tsv/vcf files over to the Z drive
         logger.info("Copying variant files over to the Z drive")
         if os.path.exists(os.path.join(self.DEST_PATH, "downloads/%s" % run_id)):
@@ -941,9 +960,22 @@ class myeloseq(object):
                                  'Genotype','Info','Length','Frequency','Amino.Acid.Change','AA','Coverage']]
                 print(add_df.head(3).to_string())
                 add_df.to_csv(os.path.join(self.MYELOSEQ_HOME,"%s.csv" % run_id), index=False, sep=",")
-                self._dropout.workbook = self.workbook
-                self._dropout.start()
-                # Copy files over to the share drive
+                self.copy_tables(run_id)
+                step_errors = []
+                try:
+                    self.generate_qc_plots(run_id)
+                except Exception as e:
+                    logger.error(str(e))
+                    step_errors.append(e)
+                self.copy_qc_plots(run_id)
+                try:
+                    self._dropout.workbook = self.workbook
+                    self._dropout.start()
+                except Exception as e:
+                    logger.error(str(e))
+                    step_errors.append(e)
+                self.copy_dropouts(run_id)
+                # Copy remaining files over to the share drive
                 self.copy_files(run_id)
                 for _, row in sample_sheet.iterrows():
                     sample = row.get("sample_id")
@@ -958,6 +990,8 @@ class myeloseq(object):
                         self.fetch_and_download_bams(sample, run_id, chip_number)
                     except Exception as e:
                         logger.error(f"Error processing sample {sample}: {e}")
+                if step_errors:
+                    raise step_errors[0]
 
             logger.info('Took %s seconds to process samples', time() - ts)
 
