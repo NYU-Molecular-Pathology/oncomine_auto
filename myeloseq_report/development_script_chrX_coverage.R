@@ -22,7 +22,7 @@ PATH_Samplesheet <- paste0(worksheet_dir,"/",
 # clean up samplesheet
 samplesheet <- read_excel(PATH_Samplesheet, sheet = 1, skip = 5)
 samplesheet <- as.data.frame(na.omit(samplesheet[,c("Bar code", "Accession #", "DNA #", "Chip #")]))
-targets <- read.table(paste0(work_dir, "/QC_data/Oncomine_Myeloid.20170817.designed.DNA.bed"), header = FALSE, sep="\t",stringsAsFactors=FALSE, quote="")
+targets <- read.table(paste0(work_dir, "/QC_data/Oncomine_Myeloid.20200429.designed.WG00895spike.sorted.20260819.bed"), header = FALSE, sep="\t",stringsAsFactors=FALSE, quote="")
 
 chrX <- targets[targets$V1 == "chrX",]
 samplesheet$`Bar code` <- ifelse(samplesheet$`Bar code` < 10,
