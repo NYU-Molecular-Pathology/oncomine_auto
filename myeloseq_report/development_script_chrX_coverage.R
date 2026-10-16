@@ -16,13 +16,14 @@ output_path = conf$MYELOSEQ$DEST_PATH
 work_dir = conf$MYELOSEQ$MYELOSEQ_HOME
 dropout_dir = conf$MYELOSEQ$DROPOUT_DIR
 worksheet_dir = conf$MYELOSEQ$DIRECTORY_TO_WATCH
+target_bed = conf$MYELOSEQ$TARGET_BED
 #
 PATH_Samplesheet <- paste0(worksheet_dir,"/",
                            runID, ".xlsm")
 # clean up samplesheet
 samplesheet <- read_excel(PATH_Samplesheet, sheet = 1, skip = 5)
 samplesheet <- as.data.frame(na.omit(samplesheet[,c("Bar code", "Accession #", "DNA #", "Chip #")]))
-targets <- read.table(paste0(work_dir, "/QC_data/Oncomine_Myeloid.20200429.designed.WG00895spike.sorted.20260819.bed"), header = FALSE, sep="\t",stringsAsFactors=FALSE, quote="")
+targets <- read.table(target_bed, header = FALSE, sep="\t",stringsAsFactors=FALSE, quote="")
 
 chrX <- targets[targets$V1 == "chrX",]
 samplesheet$`Bar code` <- ifelse(samplesheet$`Bar code` < 10,
