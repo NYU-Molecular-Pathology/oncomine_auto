@@ -107,12 +107,14 @@ class myeloseq(object):
     def get_ExAC_info(self, row):
         try:
             val = str(row['5000Exomes'])
-            amaf = re.search(r'AMAF=([^:]+)', val)
-            gmaf = re.search(r'GMAF=([^:]+)', val)
-            emaf = re.search(r'EMAF=([^:]+)', val)
-            return "%s:%s:%s" % (amaf.group(1) if amaf else "NA",
-                                 gmaf.group(1) if gmaf else "NA",
-                                 emaf.group(1) if emaf else "NA")
+            # 5000Exomes is GMAF=<af>[:<af2>]:AMAF=<af>[:<af2>]:EMAF=<af>[:<af2>].
+            # A second frequency is part of the same population, so it must not
+            # be treated as the next field. Commas keep the later ':' split intact.
+            def population(key):
+                number = r'(?:\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)'
+                m = re.search(r'(?:^|:)%s=(%s(?::%s)*)' % (key, number, number), val)
+                return m.group(1).replace(":", ",") if m else "NA"
+            return "%s:%s:%s" % (population("AMAF"), population("GMAF"), population("EMAF"))
         except:
             return "NA:NA:NA"
 
@@ -568,7 +570,10 @@ class myeloseq(object):
 
     def get_vcf_fusion_key(self, row):
         try:
-            m = re.search(r'(\w*)\[*\]*(chr\d+):(\d+)\[*\]*(\w)*',row['ALT'])
+            info = str(row['INFO'])
+            vid = str(row['ID'])
+            if 'SVTYPE=RNAExonVariant' in info and not vid.startswith(('EGFR', 'MET')):
+                return f"{row['#CHROM']}:{row['POS']}"
             return row['ID'].split("_")[0]
         except Exception as e:
             return None
@@ -580,20 +585,21 @@ class myeloseq(object):
                     return 'EGFR-EGFR.E1E8.DelPositive.1'
                 elif row['gene'] == 'MET|MET':
                     return 'MET-MET.M13M15'
+                return row['# locus'].split('-')[0]
             else:
                 return row['# locus'].split("_")[1]
         except:
             return row['# locus']
     def get_fusion_read_counts(self, row):
         try:
-            m = re.search(r'SVTYPE=([^;]*Fusion[^;]*);.*?READ_COUNT=([^;]+)', row['INFO'])
+            m = re.search(r'SVTYPE=([^;]*(?:Fusion|RNAExonVariant)[^;]*);.*?READ_COUNT=([^;]+)', row['INFO'])
             return m.group(2)
         except:
             return 0
 
     def get_fusion_RPM(self, row):
         try:
-            m = re.search(r'SVTYPE=([^;]*Fusion[^;]*);.*?RPM=([^;]+)', row['INFO'])
+            m = re.search(r'SVTYPE=([^;]*(?:Fusion|RNAExonVariant)[^;]*);.*?RPM=([^;]+)', row['INFO'])
             return m.group(2)
         except:
             return 0
@@ -787,6 +793,10 @@ class myeloseq(object):
             print(ion_variants.head(3).to_string())
             if not ion_fusions.empty:
                 ion_variants = ion_variants.merge(ion_fusions, left_on="fusion_key", right_on="fusion_key",how="left")
+                ion_variants.drop(
+                    ion_variants[(ion_variants['type'] == 'RNAExonVariant') &
+                                 (ion_variants['Read Counts'].isnull())].index,
+                    inplace=True)
             else:
                 ion_variants['Read Counts'] = 'NA'
                 ion_variants['Read/M'] = 'NA'
