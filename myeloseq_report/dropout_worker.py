@@ -199,7 +199,7 @@ class dropout(object):
         res = res.drop(columns=['Transcript_ID'])
         dropped_samples_str = ", ".join(dropped_samples_all)
         with open(os.path.join(self.WORK_DIR, "%s-dropouts.html" % run_id), 'w') as f:
-            f.write(HTML_STR.format(style_css=self.STYLE_CSS, dropped_samples=dropped_samples_str, table=res.to_html(classes='mystyle', escape=False, index=False)))
+            f.write(HTML_STR.format(style_css=self.STYLE_CSS.strip('"'), dropped_samples=dropped_samples_str, table=res.to_html(classes='mystyle', escape=False, index=False)))
 
 
         # with open(os.path.join(self.WORK_DIR, "%s-dropouts.html"%run_id), 'w') as f:
