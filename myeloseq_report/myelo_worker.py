@@ -570,10 +570,6 @@ class myeloseq(object):
 
     def get_vcf_fusion_key(self, row):
         try:
-            info = str(row['INFO'])
-            vid = str(row['ID'])
-            if 'SVTYPE=RNAExonVariant' in info and not vid.startswith(('EGFR', 'MET')):
-                return f"{row['#CHROM']}:{row['POS']}"
             return row['ID'].split("_")[0]
         except Exception as e:
             return None
@@ -585,21 +581,20 @@ class myeloseq(object):
                     return 'EGFR-EGFR.E1E8.DelPositive.1'
                 elif row['gene'] == 'MET|MET':
                     return 'MET-MET.M13M15'
-                return row['# locus'].split('-')[0]
             else:
                 return row['# locus'].split("_")[1]
         except:
             return row['# locus']
     def get_fusion_read_counts(self, row):
         try:
-            m = re.search(r'SVTYPE=([^;]*(?:Fusion|RNAExonVariant)[^;]*);.*?READ_COUNT=([^;]+)', row['INFO'])
+            m = re.search(r'SVTYPE=([^;]*Fusion[^;]*);.*?READ_COUNT=([^;]+)', row['INFO'])
             return m.group(2)
         except:
             return 0
 
     def get_fusion_RPM(self, row):
         try:
-            m = re.search(r'SVTYPE=([^;]*(?:Fusion|RNAExonVariant)[^;]*);.*?RPM=([^;]+)', row['INFO'])
+            m = re.search(r'SVTYPE=([^;]*Fusion[^;]*);.*?RPM=([^;]+)', row['INFO'])
             return m.group(2)
         except:
             return 0
@@ -756,7 +751,7 @@ class myeloseq(object):
                                                       (ion_variants_snv['tumor_AF'].astype(float) >= 1)) |
                                                      (ion_variants_snv['tumor_AF'].astype(float) >= 3))]
 
-            ion_variants_fusion = ion_variants.loc[(ion_variants['type'].isin(['FUSION','RNAExonVariant']))]
+            ion_variants_fusion = ion_variants.loc[ion_variants['type'] == 'FUSION']
             ion_variants = pd.concat([ion_variants_snv_new, ion_variants_fusion], ignore_index=True)
             ion_variants['fusion_key'] = ion_variants.apply(lambda x: self.get_tsv_fusion_key(x), axis=1)
             #select oncomine genes
@@ -793,10 +788,6 @@ class myeloseq(object):
             print(ion_variants.head(3).to_string())
             if not ion_fusions.empty:
                 ion_variants = ion_variants.merge(ion_fusions, left_on="fusion_key", right_on="fusion_key",how="left")
-                ion_variants.drop(
-                    ion_variants[(ion_variants['type'] == 'RNAExonVariant') &
-                                 (ion_variants['Read Counts'].isnull())].index,
-                    inplace=True)
             else:
                 ion_variants['Read Counts'] = 'NA'
                 ion_variants['Read/M'] = 'NA'
